@@ -38,6 +38,14 @@ import {
 } from './calendar-service.js';
 import { handleMCPRequest } from './mcp-server.js';
 import { deleteTokens } from './token-store.js';
+import {
+  validateClientCredentials,
+  generateAccessToken,
+  validateAccessToken,
+  extractBearerToken,
+  getTokenResponse,
+  getOAuthCredentials,
+} from './mcp-oauth.js';
 
 // Initialize Express app
 const app = express();
@@ -202,9 +210,73 @@ app.post('/api/respond', async (req: Request, res: Response) => {
 });
 
 // ============================================
-// MCP Protocol Endpoint
+// MCP OAuth Token Endpoint (for ChatGPT authentication)
+// ============================================
+app.post('/oauth/token', (req: Request, res: Response) => {
+  const { grant_type, client_id, client_secret } = req.body;
+
+  // Also check Authorization header for client credentials
+  let authClientId = client_id;
+  let authClientSecret = client_secret;
+  
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Basic ')) {
+    const base64Credentials = authHeader.slice(6);
+    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
+    const [headerClientId, headerClientSecret] = credentials.split(':');
+    authClientId = authClientId || headerClientId;
+    authClientSecret = authClientSecret || headerClientSecret;
+  }
+
+  // Validate grant type
+  if (grant_type !== 'client_credentials') {
+    return res.status(400).json({
+      error: 'unsupported_grant_type',
+      error_description: 'Only client_credentials grant type is supported',
+    });
+  }
+
+  // Validate client credentials
+  if (!validateClientCredentials(authClientId, authClientSecret)) {
+    return res.status(401).json({
+      error: 'invalid_client',
+      error_description: 'Invalid client credentials',
+    });
+  }
+
+  // Generate and return access token
+  const accessToken = generateAccessToken(authClientId);
+  const tokenResponse = getTokenResponse(accessToken);
+  
+  console.log('OAuth token issued for client:', authClientId);
+  res.json(tokenResponse);
+});
+
+// Endpoint to get OAuth credentials info (for setup)
+app.get('/oauth/credentials', (_req: Request, res: Response) => {
+  const { clientId } = getOAuthCredentials();
+  res.json({
+    message: 'Use these credentials in ChatGPT app configuration',
+    client_id: clientId,
+    note: 'Client secret is configured via MCP_OAUTH_CLIENT_SECRET env var',
+  });
+});
+
+// ============================================
+// MCP Protocol Endpoint (OAuth protected)
 // ============================================
 app.post('/mcp', async (req: Request, res: Response) => {
+  // Validate OAuth token
+  const token = extractBearerToken(req.headers.authorization);
+  
+  if (!token || !validateAccessToken(token)) {
+    return res.status(401).json({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Unauthorized: Invalid or missing access token' },
+      id: req.body.id || null,
+    });
+  }
+
   const { method, params } = req.body;
   const userId = DEFAULT_USER_ID;
 
@@ -280,6 +352,8 @@ function startServer(): void {
     process.exit(1);
   }
 
+  const { clientId, clientSecret } = getOAuthCredentials();
+  
   app.listen(PORT, () => {
     console.log(`
 ╔═══════════════════════════════════════════════════════════╗
@@ -288,15 +362,20 @@ function startServer(): void {
 ║  Server running on: http://localhost:${PORT}                  ║
 ║  Environment: ${process.env.NODE_ENV || 'development'}                             ║
 ╠═══════════════════════════════════════════════════════════╣
+║  MCP OAuth Credentials (for ChatGPT):                     ║
+║    Client ID: ${clientId.padEnd(40)}║
+║    Client Secret: ${clientSecret.padEnd(36)}║
+╠═══════════════════════════════════════════════════════════╣
 ║  Endpoints:                                               ║
 ║    GET  /health          - Health check                   ║
 ║    GET  /auth/status     - Check auth status              ║
 ║    GET  /auth/google     - Start OAuth flow               ║
-║    GET  /oauth/callback  - OAuth callback                 ║
+║    GET  /oauth/callback  - OAuth callback (Google)        ║
+║    POST /oauth/token     - OAuth token (ChatGPT)          ║
 ║    POST /auth/logout     - Logout                         ║
 ║    GET  /api/pending-invites - Get pending invites        ║
 ║    POST /api/respond     - Respond to invite              ║
-║    POST /mcp             - MCP protocol endpoint          ║
+║    POST /mcp             - MCP protocol (OAuth protected) ║
 ╚═══════════════════════════════════════════════════════════╝
     `);
   });
