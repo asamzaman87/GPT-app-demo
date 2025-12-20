@@ -87,19 +87,22 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // ============================================
-// Widget HTML Templates (OpenAI Apps SDK)
-// Served with text/html+skybridge content type
+// Widget Assets (OpenAI Apps SDK - React)
+// Served from the built widget directory
 // ============================================
-const widgetsDir = path.join(__dirname, 'widgets');
+const widgetDistDir = path.join(__dirname, '..', '..', 'widget', 'dist');
 
-app.get('/widgets/:name', (req: Request, res: Response) => {
+// Serve widget static assets (JS, CSS)
+app.use('/widgets/assets', express.static(path.join(widgetDistDir, 'assets'), {
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+  },
+}));
+
+// Serve widget HTML files with skybridge content type
+app.get('/widgets/:name.html', (req: Request, res: Response) => {
   const { name } = req.params;
-  const widgetPath = path.join(widgetsDir, name);
-  
-  // Security: only allow .html files
-  if (!name.endsWith('.html')) {
-    return res.status(400).send('Invalid widget file');
-  }
+  const widgetPath = path.join(widgetDistDir, `${name}.html`);
   
   // Check if file exists
   if (!fs.existsSync(widgetPath)) {
