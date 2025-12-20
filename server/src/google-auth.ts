@@ -33,9 +33,9 @@ export function validateConfig(): boolean {
   
   if (!clientId || !clientSecret || !redirectUri) {
     console.error('Missing required Google OAuth environment variables:');
-    if (!CLIENT_ID) console.error('  - GOOGLE_CLIENT_ID');
-    if (!CLIENT_SECRET) console.error('  - GOOGLE_CLIENT_SECRET');
-    if (!REDIRECT_URI) console.error('  - GOOGLE_REDIRECT_URI');
+    if (!clientId) console.error('  - GOOGLE_CLIENT_ID');
+    if (!clientSecret) console.error('  - GOOGLE_CLIENT_SECRET');
+    if (!redirectUri) console.error('  - GOOGLE_REDIRECT_URI');
     return false;
   }
   return true;
