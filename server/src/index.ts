@@ -40,11 +40,16 @@ import { handleMCPRequest } from './mcp-server.js';
 import { deleteTokens } from './token-store.js';
 import {
   validateClientCredentials,
+  validateClientId,
   generateAccessToken,
+  generateAuthorizationCode,
   validateAccessToken,
+  validateAuthorizationCode,
   extractBearerToken,
   getTokenResponse,
   getOAuthCredentials,
+  registerClient,
+  ClientRegistrationRequest,
 } from './mcp-oauth.js';
 
 // Initialize Express app
@@ -220,7 +225,7 @@ function getBaseUrl(req: Request): string {
   return `${protocol}://${host}`;
 }
 
-// OAuth 2.0 Authorization Server Metadata
+// OAuth 2.0 Authorization Server Metadata (RFC 8414)
 app.get('/.well-known/oauth-authorization-server', (req: Request, res: Response) => {
   const baseUrl = getBaseUrl(req);
   
@@ -228,11 +233,13 @@ app.get('/.well-known/oauth-authorization-server', (req: Request, res: Response)
     issuer: baseUrl,
     authorization_endpoint: `${baseUrl}/oauth/authorize`,
     token_endpoint: `${baseUrl}/oauth/token`,
-    token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic'],
-    grant_types_supported: ['client_credentials', 'authorization_code'],
+    registration_endpoint: `${baseUrl}/oauth/register`,
+    token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic', 'none'],
+    grant_types_supported: ['authorization_code', 'client_credentials'],
     response_types_supported: ['code'],
-    scopes_supported: ['mcp'],
+    scopes_supported: ['openid', 'profile', 'email', 'mcp'],
     code_challenge_methods_supported: ['S256'],
+    service_documentation: `${baseUrl}/docs`,
   });
 });
 
@@ -244,40 +251,90 @@ app.get('/.well-known/openid-configuration', (req: Request, res: Response) => {
     issuer: baseUrl,
     authorization_endpoint: `${baseUrl}/oauth/authorize`,
     token_endpoint: `${baseUrl}/oauth/token`,
-    token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic'],
-    grant_types_supported: ['client_credentials', 'authorization_code'],
+    registration_endpoint: `${baseUrl}/oauth/register`,
+    token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic', 'none'],
+    grant_types_supported: ['authorization_code', 'client_credentials'],
     response_types_supported: ['code'],
-    scopes_supported: ['openid', 'mcp'],
+    scopes_supported: ['openid', 'profile', 'email', 'mcp'],
     subject_types_supported: ['public'],
     id_token_signing_alg_values_supported: ['RS256'],
     code_challenge_methods_supported: ['S256'],
   });
 });
 
-// OAuth Authorization Endpoint (for authorization code flow)
+// Protected Resource Metadata (RFC 9728) - Required for MCP
+app.get('/.well-known/oauth-protected-resource', (req: Request, res: Response) => {
+  const baseUrl = getBaseUrl(req);
+  
+  res.json({
+    resource: `${baseUrl}/mcp`,
+    authorization_servers: [baseUrl],
+    scopes_supported: ['mcp'],
+    bearer_methods_supported: ['header'],
+  });
+});
+
+// Dynamic Client Registration (RFC 7591)
+app.post('/oauth/register', (req: Request, res: Response) => {
+  const registrationRequest: ClientRegistrationRequest = req.body;
+  
+  try {
+    const response = registerClient(registrationRequest);
+    console.log('Dynamic client registration:', response.client_id);
+    res.status(201).json(response);
+  } catch (err: any) {
+    console.error('Client registration error:', err);
+    res.status(400).json({
+      error: 'invalid_client_metadata',
+      error_description: err.message,
+    });
+  }
+});
+
+// OAuth Authorization Endpoint (for authorization code flow with PKCE)
 app.get('/oauth/authorize', (req: Request, res: Response) => {
-  const { client_id, redirect_uri, response_type, state, code_challenge, code_challenge_method } = req.query;
+  const { 
+    client_id, 
+    redirect_uri, 
+    response_type, 
+    state, 
+    code_challenge, 
+    code_challenge_method,
+    scope 
+  } = req.query;
   
-  // For client_credentials, we auto-approve and redirect with a code
-  const { clientId } = getOAuthCredentials();
-  
-  if (client_id !== clientId) {
-    return res.status(400).json({ error: 'invalid_client' });
+  // Validate client
+  if (!client_id || !validateClientId(client_id as string)) {
+    return res.status(400).json({ 
+      error: 'invalid_client',
+      error_description: 'Unknown or invalid client_id',
+    });
   }
   
   if (response_type !== 'code') {
-    return res.status(400).json({ error: 'unsupported_response_type' });
+    return res.status(400).json({ 
+      error: 'unsupported_response_type',
+      error_description: 'Only "code" response type is supported',
+    });
   }
   
-  // Generate authorization code
-  const authCode = generateAccessToken(clientId); // Reusing token generator for simplicity
-  
-  // Store code challenge for PKCE verification (simplified - in production use proper storage)
-  if (code_challenge) {
-    // Store for later verification - simplified implementation
-    (global as any).__pkce_challenges = (global as any).__pkce_challenges || {};
-    (global as any).__pkce_challenges[authCode] = { code_challenge, code_challenge_method };
+  if (!redirect_uri) {
+    return res.status(400).json({ 
+      error: 'invalid_request',
+      error_description: 'redirect_uri is required',
+    });
   }
+  
+  // Generate authorization code with PKCE support
+  const authCode = generateAuthorizationCode(
+    client_id as string,
+    redirect_uri as string,
+    code_challenge as string | undefined,
+    code_challenge_method as string | undefined,
+    scope as string | undefined
+  );
+  
+  console.log(`Authorization code generated for client: ${client_id}`);
   
   // Redirect back with code
   const redirectUrl = new URL(redirect_uri as string);
@@ -317,11 +374,25 @@ app.post('/oauth/token', (req: Request, res: Response) => {
       });
     }
     
-    // Verify the code is valid (we stored it as a token)
-    if (!validateAccessToken(code)) {
+    if (!redirect_uri) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Missing redirect_uri',
+      });
+    }
+    
+    // Validate the authorization code (with PKCE if applicable)
+    const validation = validateAuthorizationCode(
+      code,
+      authClientId || '',
+      redirect_uri,
+      code_verifier
+    );
+    
+    if (!validation.valid) {
       return res.status(400).json({
         error: 'invalid_grant',
-        error_description: 'Invalid or expired authorization code',
+        error_description: validation.error || 'Invalid authorization code',
       });
     }
     
