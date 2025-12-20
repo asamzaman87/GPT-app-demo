@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Response Result</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-color, #ffffff);
+      color: var(--text-color, #1a1a1a);
+      padding: 24px;
+      min-height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .dark {
+      --bg-color: #1a1a1a;
+      --text-color: #e5e5e5;
+      --success: #22c55e;
+      --error: #ef4444;
+    }
+    
+    .light {
+      --bg-color: #ffffff;
+      --text-color: #1a1a1a;
+      --success: #16a34a;
+      --error: #dc2626;
+    }
+    
+    .container {
+      text-align: center;
+      max-width: 400px;
+    }
+    
+    .icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+    
+    h1 {
+      font-size: 1.25rem;
+      margin-bottom: 8px;
+    }
+    
+    p {
+      opacity: 0.7;
+      font-size: 0.875rem;
+    }
+    
+    .success .icon { color: var(--success); }
+    .error .icon { color: var(--error); }
+  </style>
+</head>
+<body>
+  <div id="app" class="container">
+    <div class="icon">⏳</div>
+  </div>
+
+  <script>
+    function init() {
+      const openai = window.openai;
+      if (!openai) {
+        setTimeout(init, 100);
+        return;
+      }
+      
+      document.body.className = openai.theme === 'dark' ? 'dark' : 'light';
+      
+      const data = openai.toolOutput;
+      const app = document.getElementById('app');
+      
+      if (!data) {
+        app.innerHTML = '<div class="icon">❌</div><p>No data</p>';
+        return;
+      }
+      
+      if (data.success) {
+        const emoji = data.response === 'accepted' ? '✅' : data.response === 'declined' ? '❌' : '❓';
+        const action = data.response === 'accepted' ? 'Accepted' : data.response === 'declined' ? 'Declined' : 'Marked as Tentative';
+        
+        app.className = 'container success';
+        app.innerHTML = `
+          <div class="icon">${emoji}</div>
+          <h1>Invitation ${action}</h1>
+          <p>${data.message}</p>
+          ${data.eventSummary ? `<p style="margin-top: 8px;"><strong>${data.eventSummary}</strong></p>` : ''}
+        `;
+      } else {
+        app.className = 'container error';
+        app.innerHTML = `
+          <div class="icon">❌</div>
+          <h1>Error</h1>
+          <p>${data.error || 'Failed to respond to invitation'}</p>
+        `;
+      }
+      
+      if (openai.notifyIntrinsicHeight) {
+        openai.notifyIntrinsicHeight(document.body.scrollHeight);
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
+

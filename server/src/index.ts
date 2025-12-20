@@ -87,6 +87,33 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // ============================================
+// Widget HTML Templates (OpenAI Apps SDK)
+// Served with text/html+skybridge content type
+// ============================================
+const widgetsDir = path.join(__dirname, 'widgets');
+
+app.get('/widgets/:name', (req: Request, res: Response) => {
+  const { name } = req.params;
+  const widgetPath = path.join(widgetsDir, name);
+  
+  // Security: only allow .html files
+  if (!name.endsWith('.html')) {
+    return res.status(400).send('Invalid widget file');
+  }
+  
+  // Check if file exists
+  if (!fs.existsSync(widgetPath)) {
+    console.error(`Widget not found: ${widgetPath}`);
+    return res.status(404).send('Widget not found');
+  }
+  
+  // Serve with skybridge content type for ChatGPT
+  res.setHeader('Content-Type', 'text/html+skybridge');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.sendFile(widgetPath);
+});
+
+// ============================================
 // Authentication Routes
 // ============================================
 

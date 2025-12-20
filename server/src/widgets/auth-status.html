@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auth Status</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-color, #ffffff);
+      color: var(--text-color, #1a1a1a);
+      padding: 24px;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .dark {
+      --bg-color: #1a1a1a;
+      --text-color: #e5e5e5;
+      --card-bg: #2a2a2a;
+      --card-border: #3a3a3a;
+      --accent: #22c55e;
+    }
+    
+    .light {
+      --bg-color: #ffffff;
+      --text-color: #1a1a1a;
+      --card-bg: #f9fafb;
+      --card-border: #e5e7eb;
+      --accent: #16a34a;
+    }
+    
+    .container {
+      text-align: center;
+      max-width: 400px;
+    }
+    
+    .icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+    }
+    
+    p {
+      opacity: 0.7;
+      line-height: 1.5;
+    }
+    
+    .btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 32px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    
+    .btn:hover {
+      opacity: 0.9;
+    }
+    
+    .connected-info {
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: var(--card-bg);
+      border-radius: 8px;
+      font-size: 0.875rem;
+    }
+    
+    .features {
+      margin-top: 24px;
+      text-align: left;
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+    }
+    
+    .feature-icon {
+      font-size: 1.25rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="container">
+    <div class="icon">⏳</div>
+    <p>Checking status...</p>
+  </div>
+
+  <script>
+    function init() {
+      const openai = window.openai;
+      if (!openai) {
+        setTimeout(init, 100);
+        return;
+      }
+      
+      document.body.className = openai.theme === 'dark' ? 'dark' : 'light';
+      
+      const data = openai.toolOutput;
+      const app = document.getElementById('app');
+      
+      if (!data) {
+        app.innerHTML = '<div class="icon">❌</div><p>No data available</p>';
+        return;
+      }
+      
+      if (data.authenticated) {
+        app.innerHTML = `
+          <div class="icon">✅</div>
+          <h1>Connected!</h1>
+          <div class="connected-info">
+            <strong>Account:</strong> ${data.email || 'Connected'}
+          </div>
+          <div class="features">
+            <div class="feature">
+              <span class="feature-icon">📋</span>
+              <span>View pending calendar invitations</span>
+            </div>
+            <div class="feature">
+              <span class="feature-icon">✓</span>
+              <span>Accept or decline invites</span>
+            </div>
+            <div class="feature">
+              <span class="feature-icon">❓</span>
+              <span>Mark invites as tentative</span>
+            </div>
+          </div>
+          <button class="btn" onclick="window.openai.sendFollowUpMessage('Show my pending calendar invitations')">
+            View Pending Invites
+          </button>
+        `;
+      } else {
+        app.innerHTML = `
+          <div class="icon">🔐</div>
+          <h1>Connect Google Calendar</h1>
+          <p>Link your Google account to manage calendar invitations directly from ChatGPT.</p>
+          <button class="btn" onclick="window.openai.openExternal('${data.authUrl}')">
+            Connect Google Calendar
+          </button>
+        `;
+      }
+      
+      if (openai.notifyIntrinsicHeight) {
+        openai.notifyIntrinsicHeight(document.body.scrollHeight);
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
+
