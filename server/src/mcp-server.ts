@@ -30,8 +30,14 @@ function createToolResult(text: string, isError = false): CallToolResult {
 /**
  * Define the available MCP tools
  * Each tool includes annotations for visibility and behavior hints
+ * OpenAI visibility: "public" makes tools available in ChatGPT
  */
-const TOOLS: (Tool & { annotations?: Record<string, unknown> })[] = [
+interface MCPTool extends Tool {
+  annotations?: Record<string, unknown>;
+  'openai/visibility'?: 'public' | 'hidden';
+}
+
+const TOOLS: MCPTool[] = [
   {
     name: 'get_pending_reservations',
     description:
@@ -57,6 +63,7 @@ const TOOLS: (Tool & { annotations?: Record<string, unknown> })[] = [
       readOnlyHint: true,
       openWorldHint: false,
     },
+    'openai/visibility': 'public',
   },
   {
     name: 'respond_to_invite',
@@ -85,6 +92,7 @@ const TOOLS: (Tool & { annotations?: Record<string, unknown> })[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
+    'openai/visibility': 'public',
   },
   {
     name: 'check_auth_status',
@@ -100,6 +108,7 @@ const TOOLS: (Tool & { annotations?: Record<string, unknown> })[] = [
       readOnlyHint: true,
       openWorldHint: false,
     },
+    'openai/visibility': 'public',
   },
 ];
 
@@ -263,10 +272,16 @@ const SERVER_INFO = {
 
 /**
  * MCP Server Capabilities
+ * Includes experimental OpenAI visibility support
  */
 const SERVER_CAPABILITIES = {
   tools: {
     listChanged: false,
+  },
+  experimental: {
+    'openai/visibility': {
+      enabled: true,
+    },
   },
 };
 
@@ -291,10 +306,14 @@ export async function handleMCPRequest(
       // MCP initialization handshake
       // Client sends its info, we respond with our info and capabilities
       const clientInfo = params.clientInfo as { name?: string; version?: string } | undefined;
-      console.log('MCP initialize from client:', clientInfo);
+      const clientProtocolVersion = params.protocolVersion as string | undefined;
+      console.log('MCP initialize from client:', clientInfo, 'protocol:', clientProtocolVersion);
+      
+      // Use the client's protocol version if provided, otherwise default
+      const protocolVersion = clientProtocolVersion || '2024-11-05';
       
       return {
-        protocolVersion: '2024-11-05',
+        protocolVersion,
         serverInfo: SERVER_INFO,
         capabilities: SERVER_CAPABILITIES,
       };
