@@ -22,7 +22,7 @@ export interface OpenAIWidget {
   
   // APIs
   callTool?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
-  openExternal?: (url: string) => void;
+  openExternal?: (options: { href: string }) => void;
   sendFollowUpMessage?: (message: string) => void;
   notifyIntrinsicHeight?: (height: number) => void;
   setWidgetState?: (state: Record<string, unknown> | ((prev: Record<string, unknown>) => Record<string, unknown>)) => void;
@@ -130,11 +130,13 @@ export function useOpenAI<T = unknown>() {
     return openai.callTool(name, args);
   };
 
-  const openExternal = (url: string) => {
+  const openExternal = (options: { href: string } | string) => {
+    const href = typeof options === 'string' ? options : options.href;
     if (openai?.openExternal) {
-      openai.openExternal(url);
+      // ChatGPT's openExternal expects { href: url } object
+      (openai.openExternal as (opt: { href: string }) => void)({ href });
     } else {
-      window.open(url, '_blank');
+      window.open(href, '_blank');
     }
   };
 

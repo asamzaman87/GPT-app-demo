@@ -17,7 +17,7 @@ function Connected({ email, sendFollowUp, isDark }: { email?: string | null; sen
           </div>
           <div>
             <h2 className={`text-lg font-semibold ${isDark ? 'text-gray-900' : 'text-white'}`}>Connected</h2>
-            <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-zinc-400'}`}>Google Calendar linked</p>
+            <p className={`text-sm ${isDark ? 'text-black' : 'text-zinc-400'}`}>Google Calendar linked</p>
           </div>
         </div>
         <Badge color="success">Active</Badge>
@@ -38,11 +38,12 @@ function Connected({ email, sendFollowUp, isDark }: { email?: string | null; sen
   );
 }
 
-function NotConnected({ authUrl, openExternal, isDark }: { authUrl: string; openExternal: (url: string) => void; isDark: boolean }) {
+function NotConnected({ authUrl, openExternal, isDark }: { authUrl: string; openExternal: (options: { href: string }) => void; isDark: boolean }) {
   const handleConnect = () => {
     console.log('[Widget] Connect clicked, authUrl:', authUrl);
     if (authUrl && authUrl.length > 0) {
-      openExternal(authUrl);
+      // ChatGPT's openExternal expects { href: url } object
+      openExternal({ href: authUrl });
     } else {
       console.error('[Widget] No auth URL available');
     }
@@ -56,16 +57,16 @@ function NotConnected({ authUrl, openExternal, isDark }: { authUrl: string; open
           <Calendar className="size-7 text-primary" />
         </div>
         
-        <h2 className={`text-lg font-semibold mb-2 ${isDark ? 'text-gray-900' : 'text-white'}`}>
+        <h2 className={`text-lg font-semibold mb-2 ${isDark ? 'text-black' : 'text-white'}`}>
           Connect Google Calendar
         </h2>
         
-        <p className={`text-sm mb-6 max-w-[280px] ${isDark ? 'text-gray-500' : 'text-zinc-400'}`}>
+        <p className={`text-sm mb-6 max-w-[280px] ${isDark ? 'text-black' : 'text-zinc-400'}`}>
           Link your Google account to manage calendar invitations directly from ChatGPT
         </p>
 
         {authUrl && authUrl.length > 0 ? (
-          <Button variant="outline" color="secondary" block onClick={handleConnect}>
+          <Button variant="outline" className='text-black' color="primary" block onClick={handleConnect}>
             <svg className="size-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -77,7 +78,7 @@ function NotConnected({ authUrl, openExternal, isDark }: { authUrl: string; open
         ) : (
           <div className="flex items-center justify-center gap-2 py-3">
             <div className={`size-4 rounded-full border-2 border-t-primary animate-spin ${isDark ? 'border-gray-300' : 'border-zinc-600'}`} />
-            <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-zinc-400'}`}>Loading...</p>
+            <p className={`text-sm ${isDark ? 'text-black' : 'text-zinc-400'}`}>Loading...</p>
           </div>
         )}
 
@@ -93,7 +94,7 @@ function Loading({ isDark }: { isDark: boolean }) {
   return (
     <div className="flex items-center justify-center gap-3 py-8">
       <div className={`size-5 rounded-full border-2 border-t-primary animate-spin ${isDark ? 'border-gray-300' : 'border-zinc-600'}`} />
-      <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-zinc-400'}`}>Checking connection...</p>
+      <p className={`text-sm ${isDark ? 'text-black' : 'text-zinc-400'}`}>Checking connection...</p>
     </div>
   );
 }
@@ -118,7 +119,7 @@ export default function AuthStatus() {
   if (error) {
     return (
       <div className={`p-6 rounded-xl border text-center shadow-sm ${isDark ? 'bg-white border-gray-200' : 'bg-zinc-900 border-zinc-700'}`}>
-        <p className={isDark ? 'text-gray-500' : 'text-zinc-400'}>{error}</p>
+        <p className={isDark ? 'text-black' : 'text-zinc-400'}>{error}</p>
       </div>
     );
   }
@@ -126,7 +127,7 @@ export default function AuthStatus() {
   if (!data) {
     return (
       <div className={`p-6 rounded-xl border text-center shadow-sm ${isDark ? 'bg-white border-gray-200' : 'bg-zinc-900 border-zinc-700'}`}>
-        <p className={isDark ? 'text-gray-500' : 'text-zinc-400'}>No data</p>
+        <p className={isDark ? 'text-black' : 'text-zinc-400'}>No data</p>
       </div>
     );
   }
