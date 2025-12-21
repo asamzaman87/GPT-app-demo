@@ -465,6 +465,11 @@ export async function handleMCPRequest(
       return {};
     }
     
+    case 'notifications/initialized': {
+      console.log('MCP client notifications/initialized');
+      return {};
+    }
+    
     case 'ping': {
       return { status: 'ok' };
     }
