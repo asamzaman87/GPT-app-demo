@@ -218,6 +218,9 @@ async function handleGetPendingReservations(
         authRequired: true,
         authUrl,
       },
+      _meta: {
+        'openai/outputTemplate': 'ui://widget/auth-status.html',
+      },
       isError: false,
     };
   }
@@ -236,6 +239,9 @@ async function handleGetPendingReservations(
         invites: result.invites,
         dateRange: result.dateRange,
         totalCount: result.totalCount,
+      },
+      _meta: {
+        'openai/outputTemplate': 'ui://widget/pending-invites.html',
       },
       isError: false,
     };
@@ -294,6 +300,9 @@ async function handleRespondToInvite(
         message: result.message,
         eventSummary: result.eventSummary,
       },
+      _meta: {
+        'openai/outputTemplate': 'ui://widget/respond-result.html',
+      },
       isError: false,
     };
   } catch (error: any) {
@@ -318,6 +327,9 @@ function handleCheckAuthStatus(userId: string): AppsToolResponse {
         authenticated: true,
         email: null,
       },
+      _meta: {
+        'openai/outputTemplate': 'ui://widget/auth-status.html',
+      },
       isError: false,
     };
   } else {
@@ -327,6 +339,9 @@ function handleCheckAuthStatus(userId: string): AppsToolResponse {
       structuredContent: {
         authenticated: false,
         authUrl,
+      },
+      _meta: {
+        'openai/outputTemplate': 'ui://widget/auth-status.html',
       },
       isError: false,
     };
