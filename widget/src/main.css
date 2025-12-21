@@ -1,7 +1,8 @@
 @import "tailwindcss";
 @import "@openai/apps-sdk-ui/css";
 
-/* Required for Tailwind to find class references in Apps SDK UI components */
+/* Tell Tailwind where to find class references */
+@source "./";
 @source "../node_modules/@openai/apps-sdk-ui";
 
 /* Additional custom styles if needed */
