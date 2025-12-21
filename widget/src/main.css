@@ -1,52 +1,7 @@
 @import "tailwindcss";
+@import "@openai/apps-sdk-ui/css";
 
-/* Use system fonts instead of Google Fonts (blocked by CSP) */
-:root {
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  
-  /* OpenAI-style color tokens */
-  --bg-color: #ffffff;
-  --text-primary: #1a1a1a;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-  --surface-primary: #ffffff;
-  --surface-secondary: #f9fafb;
-  --border-default: #e5e7eb;
-  --primary: #10a37f;
-  --primary-hover: #0d8c6d;
-}
+/* Required for Tailwind to find class references in Apps SDK UI components */
+@source "../node_modules/@openai/apps-sdk-ui";
 
-.dark {
-  --bg-color: #1a1a1a;
-  --text-primary: #e5e5e5;
-  --text-secondary: #9ca3af;
-  --text-tertiary: #6b7280;
-  --surface-primary: #1a1a1a;
-  --surface-secondary: #2a2a2a;
-  --border-default: #3a3a3a;
-  --primary: #10a37f;
-  --primary-hover: #0d8c6d;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  font-family: var(--font-sans);
-  background-color: var(--surface-primary);
-  color: var(--text-primary);
-}
-
-/* Utility classes matching Apps SDK UI */
-.bg-surface-primary { background-color: var(--surface-primary); }
-.bg-surface-secondary { background-color: var(--surface-secondary); }
-.text-text-primary { color: var(--text-primary); }
-.text-text-secondary { color: var(--text-secondary); }
-.text-text-tertiary { color: var(--text-tertiary); }
-.border-border-default { border-color: var(--border-default); }
-.bg-primary { background-color: var(--primary); }
-.hover\:bg-primary-hover:hover { background-color: var(--primary-hover); }
-
+/* Additional custom styles if needed */
