@@ -188,7 +188,7 @@ function AuthView({ initialAuthData }: { initialAuthData: AuthStatusOutput | nul
           {isPolling ? 'Waiting for Sign In...' : 'Connect Google Calendar'}
         </h2>
         
-        <p className={`text-sm mb-6 max-w-[280px] ${theme.textSecondary(isDark)}`}>
+        <p className={`text-sm mb-6 max-w-[280px] ${theme.textPrimary(isDark)}`}>
           {isPolling 
             ? 'Complete the sign-in in the new tab. This will update automatically.'
             : 'Link your Google account to manage calendar invitations directly from ChatGPT'
@@ -215,7 +215,7 @@ function AuthView({ initialAuthData }: { initialAuthData: AuthStatusOutput | nul
         ) : (
           <div className="flex items-center justify-center gap-2 py-3">
             <div className={`size-4 rounded-full border-2 border-t-blue-500 animate-spin ${theme.spinner(isDark)}`} />
-            <p className={`text-sm ${theme.textSecondary(isDark)}`}>Loading...</p>
+            <p className={`text-sm ${theme.textPrimary(isDark)}`}>Loading...</p>
           </div>
         )}
 
@@ -509,6 +509,17 @@ function WidgetRouter({ initialData }: { initialData: unknown }) {
       return;
     }
     
+    // Check if auth is required (from get_pending_reservations when not authenticated)
+    if ('authRequired' in data && data.authRequired === true) {
+      console.log('[Widget] Detected authRequired, showing auth view');
+      setAuthData({ 
+        authenticated: false, 
+        authUrl: data.authUrl as string | undefined 
+      });
+      setInitialRouteSet(true);
+      return;
+    }
+    
     // Check if it's auth data (has 'authenticated')
     if ('authenticated' in data) {
       console.log('[Widget] Detected auth data, staying on /');
@@ -523,10 +534,22 @@ function WidgetRouter({ initialData }: { initialData: unknown }) {
   }, [initialData, initialRouteSet, navigate, setAuthData, setInvitesData, setRespondData]);
 
   // Derive initial auth data for AuthView
-  const initialAuthData: AuthStatusOutput | null = 
-    (initialData && 'authenticated' in (initialData as Record<string, unknown>))
-      ? initialData as AuthStatusOutput
-      : authData;
+  const initialAuthData: AuthStatusOutput | null = (() => {
+    if (!initialData) return authData;
+    const data = initialData as Record<string, unknown>;
+    
+    // Handle authRequired from get_pending_reservations
+    if ('authRequired' in data && data.authRequired === true) {
+      return { authenticated: false, authUrl: data.authUrl as string | undefined };
+    }
+    
+    // Handle regular auth data
+    if ('authenticated' in data) {
+      return initialData as AuthStatusOutput;
+    }
+    
+    return authData;
+  })();
 
   return (
     <Routes>
