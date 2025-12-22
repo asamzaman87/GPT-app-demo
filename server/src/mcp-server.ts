@@ -3,6 +3,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
   Tool,
   CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -404,6 +406,39 @@ export function createMCPServer(): Server {
           isError: true,
         };
     }
+  });
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    return { resources: getWidgetResources() };
+  });
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const uri = request.params.uri;
+    console.error('Reading resource:', uri);
+    
+    // Parse the widget name from ui://widget/name.html
+    const match = uri.match(/^ui:\/\/widget\/(.+\.html)$/);
+    if (match) {
+      const widgetName = match[1].replace('.html', '');
+      const content = readWidgetContent(widgetName);
+      
+      // Get metadata from resources
+      const resources = getWidgetResources();
+      const resource = resources.find(r => r.uri === uri);
+      
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'text/html+skybridge',
+            text: content,
+            _meta: resource?._meta || {},
+          },
+        ],
+      };
+    }
+    
+    throw new Error(`Resource not found: ${uri}`);
   });
 
   return server;
