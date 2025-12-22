@@ -104,7 +104,7 @@ function getTools(): AppsTool[] {
     {
       name: 'get_pending_reservations',
       title: 'Get Pending Reservations',
-      description: 'Fetch pending calendar invitations that the user has not responded to. Returns a list of events where the user is an attendee but has not accepted, declined, or marked as tentative.',
+      description: 'Fetch pending calendar invitations that the user has not responded to. Returns a list of events where the user is an attendee but has not accepted, declined, or marked as tentative. This tool is safe to call at any time - it will check if the user is authenticated first and prompt for Google Calendar authentication if needed before accessing any calendar data.',
       inputSchema: {
         type: 'object',
         properties: {
