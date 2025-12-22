@@ -587,12 +587,17 @@ export async function handleMCPRequest(
         const widgetName = match[1].replace('.html', '');
         const content = readWidgetContent(widgetName);
         
+        // Get metadata from resources
+        const resources = getWidgetResources();
+        const resource = resources.find(r => r.uri === uri);
+        
         return {
           contents: [
             {
               uri,
               mimeType: 'text/html+skybridge',
               text: content,
+              _meta: resource?._meta || {},
             },
           ],
         };
