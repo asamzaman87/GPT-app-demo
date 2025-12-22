@@ -29,11 +29,3 @@ export interface AuthStatusOutput {
   email?: string | null;
   authUrl?: string;
 }
-
-export interface RespondResultOutput {
-  success: boolean;
-  response?: string;
-  message?: string;
-  eventSummary?: string;
-  error?: string;
-}

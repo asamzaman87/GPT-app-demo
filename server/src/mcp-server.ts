@@ -50,9 +50,11 @@ function getWidgetResources(): WidgetResource[] {
       name: 'Calendar Widget',
       mimeType: 'text/html+skybridge',
       _meta: {
+        'openai/widgetPrefersBorder': true,
+        'openai/widgetDomain': 'https://chatgpt.com',
         'openai/widgetCSP': {
-          connect_domains: [baseUrl, 'https://accounts.google.com'],
-          resource_domains: [baseUrl],
+          connect_domains: ['https://chatgpt.com', baseUrl, 'https://accounts.google.com'],
+          resource_domains: [baseUrl, 'https://*.oaistatic.com'],
           redirect_domains: ['https://accounts.google.com'],
         },
       },
