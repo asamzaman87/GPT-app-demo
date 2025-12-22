@@ -6,7 +6,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const widgets = ['pending-invites', 'auth-status', 'respond-result'];
+// Build unified widget + legacy widgets for backward compatibility
+const widgets = ['calendar-widget', 'pending-invites', 'auth-status', 'respond-result'];
 
 async function buildWidgets() {
   for (const widget of widgets) {

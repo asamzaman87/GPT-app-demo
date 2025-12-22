@@ -44,6 +44,20 @@ function getWidgetResources(): WidgetResource[] {
   const baseUrl = getWidgetBaseUrl();
   
   return [
+    // Unified calendar widget with React Router
+    {
+      uri: 'ui://widget/calendar-widget.html',
+      name: 'Calendar Widget',
+      mimeType: 'text/html+skybridge',
+      _meta: {
+        'openai/widgetCSP': {
+          connect_domains: [baseUrl, 'https://accounts.google.com'],
+          resource_domains: [baseUrl],
+          redirect_domains: ['https://accounts.google.com'],
+        },
+      },
+    },
+    // Legacy widgets (kept for backward compatibility)
     {
       uri: 'ui://widget/pending-invites.html',
       name: 'Pending Invites Widget',
@@ -142,7 +156,7 @@ function getTools(): AppsTool[] {
         additionalProperties: false,
       },
       _meta: {
-        'openai/outputTemplate': 'ui://widget/pending-invites.html',
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
         'openai/visibility': 'public',
         'openai/widgetAccessible': true,
       },
@@ -168,7 +182,7 @@ function getTools(): AppsTool[] {
         additionalProperties: false,
       },
       _meta: {
-        'openai/outputTemplate': 'ui://widget/respond-result.html',
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
         'openai/visibility': 'public',
         'openai/widgetAccessible': false,
       },
@@ -184,7 +198,7 @@ function getTools(): AppsTool[] {
         additionalProperties: false,
       },
       _meta: {
-        'openai/outputTemplate': 'ui://widget/auth-status.html',
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
         'openai/visibility': 'public',
         'openai/widgetAccessible': true, // Allow widget to call this tool for polling auth status
       },
@@ -219,7 +233,7 @@ async function handleGetPendingReservations(
         authUrl,
       },
       _meta: {
-        'openai/outputTemplate': 'ui://widget/auth-status.html',
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
       },
       isError: false,
     };
@@ -241,7 +255,7 @@ async function handleGetPendingReservations(
         totalCount: result.totalCount,
       },
       _meta: {
-        'openai/outputTemplate': 'ui://widget/pending-invites.html',
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
       },
       isError: false,
     };
@@ -301,7 +315,7 @@ async function handleRespondToInvite(
         eventSummary: result.eventSummary,
       },
       _meta: {
-        'openai/outputTemplate': 'ui://widget/respond-result.html',
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
       },
       isError: false,
     };
@@ -328,7 +342,7 @@ function handleCheckAuthStatus(userId: string): AppsToolResponse {
         email: null,
       },
       _meta: {
-        'openai/outputTemplate': 'ui://widget/auth-status.html',
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
       },
       isError: false,
     };
@@ -341,7 +355,7 @@ function handleCheckAuthStatus(userId: string): AppsToolResponse {
         authUrl,
       },
       _meta: {
-        'openai/outputTemplate': 'ui://widget/auth-status.html',
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
       },
       isError: false,
     };
