@@ -17,6 +17,8 @@ interface WidgetContextType {
   openExternal: (options: { href: string }) => void;
   notifyHeight: () => void;
   setWidgetState: (state: Record<string, unknown>) => void;
+  authData: AuthStatusOutput | null;
+  setAuthData: (data: AuthStatusOutput | null) => void;
   invitesData: PendingInvitesOutput | null;
   setInvitesData: (data: PendingInvitesOutput | null) => void;
   respondData: RespondResultOutput | null;
@@ -34,15 +36,14 @@ function useWidget() {
 // ============================================
 // Auth View (/ route)
 // ============================================
-function AuthView({ authData }: { authData: AuthStatusOutput | null }) {
-  const { isDark, callTool, openExternal, setWidgetState, setInvitesData, notifyHeight } = useWidget();
+function AuthView({ initialAuthData }: { initialAuthData: AuthStatusOutput | null }) {
+  const { isDark, callTool, openExternal, setWidgetState, setInvitesData, notifyHeight, authData, setAuthData } = useWidget();
   const navigate = useNavigate();
   const [isPolling, setIsPolling] = useState(false);
   const [isLoadingInvites, setIsLoadingInvites] = useState(false);
-  const [localAuthData, setLocalAuthData] = useState<AuthStatusOutput | null>(authData);
 
-  // Use localAuthData if we've updated it via polling, otherwise use initial authData
-  const currentAuth = localAuthData || authData;
+  // Use context authData (persists across navigation), fallback to initial
+  const currentAuth = authData || initialAuthData;
   const isAuthenticated = currentAuth?.authenticated ?? false;
 
   useEffect(() => { notifyHeight(); }, [isAuthenticated, isPolling, notifyHeight]);
@@ -55,7 +56,7 @@ function AuthView({ authData }: { authData: AuthStatusOutput | null }) {
       try {
         const result = await callTool('check_auth_status', {}) as { structuredContent?: AuthStatusOutput };
         if (result?.structuredContent?.authenticated) {
-          setLocalAuthData(result.structuredContent);
+          setAuthData(result.structuredContent); // Store in context (persists across navigation)
           setWidgetState({ authenticated: true, email: result.structuredContent.email });
           setIsPolling(false);
         }
@@ -71,7 +72,7 @@ function AuthView({ authData }: { authData: AuthStatusOutput | null }) {
       clearInterval(pollInterval);
       clearTimeout(timeout);
     };
-  }, [isPolling, callTool, setWidgetState]);
+  }, [isPolling, callTool, setWidgetState, setAuthData]);
 
   const handleConnect = () => {
     if (currentAuth?.authUrl) {
@@ -398,7 +399,7 @@ function ResultView() {
 // ============================================
 // Main Widget with Router
 // ============================================
-function WidgetRouter({ authData }: { authData: AuthStatusOutput | null }) {
+function WidgetRouter({ initialAuthData }: { initialAuthData: AuthStatusOutput | null }) {
   const location = useLocation();
   
   // Log navigation for debugging
@@ -408,7 +409,7 @@ function WidgetRouter({ authData }: { authData: AuthStatusOutput | null }) {
 
   return (
     <Routes>
-      <Route path="/" element={<AuthView authData={authData} />} />
+      <Route path="/" element={<AuthView initialAuthData={initialAuthData} />} />
       <Route path="/invites" element={<InvitesView />} />
       <Route path="/result" element={<ResultView />} />
     </Routes>
@@ -419,18 +420,25 @@ export default function CalendarWidget() {
   const { data, theme, isLoading, error, callTool, openExternal, notifyHeight, setWidgetState, openai } = useOpenAI<AuthStatusOutput>();
   const isDark = theme === 'dark';
   
-  // Shared state for views
+  // Shared state for views (persists across navigation)
+  const [authData, setAuthData] = useState<AuthStatusOutput | null>(null);
   const [invitesData, setInvitesData] = useState<PendingInvitesOutput | null>(null);
   const [respondData, setRespondData] = useState<RespondResultOutput | null>(null);
 
   // Restore state from widgetState on mount
   useEffect(() => {
     const state = openai?.widgetState as { 
+      authenticated?: boolean;
+      email?: string;
       view?: string;
       invites?: PendingInvitesOutput;
       result?: RespondResultOutput;
     } | null;
     
+    // Restore auth state
+    if (state?.authenticated) {
+      setAuthData({ authenticated: true, email: state.email || undefined });
+    }
     if (state?.invites) setInvitesData(state.invites);
     if (state?.result) setRespondData(state.result);
   }, [openai?.widgetState]);
@@ -442,6 +450,8 @@ export default function CalendarWidget() {
     openExternal,
     notifyHeight,
     setWidgetState,
+    authData,
+    setAuthData,
     invitesData,
     setInvitesData,
     respondData,
@@ -470,7 +480,7 @@ export default function CalendarWidget() {
   return (
     <WidgetContext.Provider value={contextValue}>
       <BrowserRouter>
-        <WidgetRouter authData={data} />
+        <WidgetRouter initialAuthData={data} />
       </BrowserRouter>
     </WidgetContext.Provider>
   );
