@@ -164,8 +164,8 @@ function getTools(): AppsTool[] {
       },
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
-        'openai/visibility': 'public',
-        'openai/widgetAccessible': true, // Allow widget to call this tool for polling auth status
+        'openai/visibility': 'private', // Hidden from ChatGPT UI - users use get_pending_reservations instead
+        'openai/widgetAccessible': true, // Widget can still call this for polling auth status
       },
     },
   ];
@@ -447,7 +447,7 @@ export async function handleMCPRequest(
         protocolVersion,
         serverInfo: SERVER_INFO,
         capabilities: SERVER_CAPABILITIES,
-        instructions: 'This server manages Google Calendar reservations. Use check_auth_status to verify authentication, get_pending_reservations to list pending invites, and respond_to_invite to accept/decline invitations.',
+        instructions: 'This server manages Google Calendar reservations. Use get_pending_reservations to list pending calendar invites (will prompt for authentication if needed), and respond_to_invite to accept/decline invitations.',
       };
       
       console.log('MCP initialize response:', JSON.stringify(response));
