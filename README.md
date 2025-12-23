@@ -7,11 +7,13 @@ A ChatGPT app that helps you manage pending Google Calendar invitations directly
 - 🗓️ **View Pending Invitations** - See all calendar invites awaiting your response
 - ✅ **Quick Actions** - Accept, decline, or mark invitations as tentative with one click
 - 💬 **Natural Language** - Interact with your calendar through ChatGPT conversations
-- 🔐 **Secure OAuth 2.0** - Google Calendar authentication with automatic token refresh
+- 🔐 **Secure OAuth 2.1** - Google Calendar authentication with automatic token refresh
+- 🔄 **Refresh Token Support** - Long-lived sessions with automatic token rotation (30 days)
 - 👥 **Multi-User Support** - Each ChatGPT user has their own isolated authentication and data
-- 🎨 **Modern UI** - Beautiful, theme-aware widget with dark/light mode support
+- 🎨 **Modern UI** - Beautiful, theme-aware widget with 3D card effects and dark/light mode
 - 🔄 **Real-time Updates** - Refresh invites on-demand with a single click
 - 🚀 **Single-Page Widget** - Unified React Router-based interface for seamless navigation
+- 🛡️ **OAuth 2.1 Compliant** - Full MCP authorization spec with PKCE, refresh tokens, and discovery endpoints
 
 ---
 
@@ -32,8 +34,11 @@ A ChatGPT app that helps you manage pending Google Calendar invitations directly
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  MCP OAuth Layer (mcp-oauth.ts)                       │  │
 │  │  - Client credentials validation                      │  │
-│  │  - Access token generation                            │  │
+│  │  - Access token + refresh token generation           │  │
 │  │  - Authorization code flow with PKCE                  │  │
+│  │  - Refresh token rotation (30-day expiry)            │  │
+│  │  - Resource parameter handling                       │  │
+│  │  - OAuth 2.1 discovery endpoints                     │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                         │                                    │
 │  ┌───────────────────────────────────────────────────────┐  │
@@ -341,11 +346,13 @@ const card = (isDark) => isDark
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `GET /.well-known/openid-configuration` | GET | OAuth server metadata (RFC 8414) |
+| `GET /.well-known/oauth-authorization-server` | GET | OAuth server metadata (RFC 8414) - Discovery endpoint for ChatGPT |
+| `GET /.well-known/oauth-protected-resource` | GET | Protected resource metadata (RFC 9728) - Required for MCP |
+| `GET /.well-known/openid-configuration` | GET | OpenID Connect discovery (optional) |
 | `POST /oauth/register` | POST | Dynamic client registration (RFC 7591) |
-| `GET /oauth/authorize` | GET | Authorization endpoint (PKCE flow) |
-| `POST /oauth/token` | POST | Token endpoint (client_credentials + authorization_code grants) |
-| `GET /oauth/info` | GET | Display OAuth credentials for setup |
+| `GET /oauth/authorize` | GET | Authorization endpoint with PKCE + resource parameter support |
+| `POST /oauth/token` | POST | Token endpoint (supports `authorization_code`, `client_credentials`, `refresh_token` grants) |
+| `GET /oauth/credentials` | GET | Display OAuth credentials for setup |
 
 ### Google OAuth Endpoints
 
@@ -362,6 +369,395 @@ const card = (isDark) => isDark
 |----------|--------|-------------|
 | `GET /health` | GET | Health check endpoint |
 | `GET /` | GET | Server info and status page |
+
+---
+
+## OAuth 2.1 Implementation
+
+### Overview
+
+This app implements **full OAuth 2.1 compliance** for both ChatGPT authentication (MCP OAuth) and Google Calendar access. It supports long-lived sessions through refresh tokens, automatic token rotation, and comprehensive security policies.
+
+### Two OAuth Layers
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Layer 1: MCP OAuth (ChatGPT ↔ Your Server)        │
+│  - Authenticates ChatGPT to access MCP tools        │
+│  - Issues: access_token (1h) + refresh_token (30d) │
+│  - Supports: client_credentials, authorization_code,│
+│             refresh_token grants                    │
+└─────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────┐
+│  Layer 2: Google OAuth (Your Server ↔ Google)      │
+│  - Authenticates users to access Google Calendar   │
+│  - Issues: access_token (1h) + refresh_token       │
+│  - Auto-refreshes before expiration                 │
+│  - Per-user token storage and management           │
+└─────────────────────────────────────────────────────┘
+```
+
+### Discovery Endpoints
+
+#### 1. OAuth Authorization Server Metadata
+**Endpoint:** `GET /.well-known/oauth-authorization-server`
+
+```json
+{
+  "issuer": "https://your-app.railway.app",
+  "authorization_endpoint": "https://your-app.railway.app/oauth/authorize",
+  "token_endpoint": "https://your-app.railway.app/oauth/token",
+  "registration_endpoint": "https://your-app.railway.app/oauth/register",
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_post",
+    "client_secret_basic",
+    "none"
+  ],
+  "grant_types_supported": [
+    "authorization_code",
+    "client_credentials",
+    "refresh_token"
+  ],
+  "response_types_supported": ["code"],
+  "scopes_supported": [
+    "calendar:read",
+    "calendar:write",
+    "mcp"
+  ],
+  "code_challenge_methods_supported": ["S256"]
+}
+```
+
+**Purpose:** ChatGPT uses this endpoint to discover your OAuth configuration automatically.
+
+#### 2. Protected Resource Metadata
+**Endpoint:** `GET /.well-known/oauth-protected-resource`
+
+```json
+{
+  "resource": "https://your-app.railway.app",
+  "authorization_servers": ["https://your-app.railway.app"],
+  "scopes_supported": [
+    "calendar:read",
+    "calendar:write",
+    "mcp"
+  ],
+  "bearer_methods_supported": ["header"],
+  "resource_documentation": "https://your-app.railway.app/docs"
+}
+```
+
+**Purpose:** Required by MCP spec (RFC 9728). Tells ChatGPT where to authenticate and what scopes are available.
+
+### Token Lifecycle
+
+#### Access Token + Refresh Token Pair
+
+```typescript
+// Token Response
+{
+  "access_token": "abc123...",      // Short-lived (1 hour)
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "xyz789...",     // Long-lived (30 days)
+  "scope": "calendar:read calendar:write"
+}
+```
+
+#### Flow Diagram
+
+```
+1. Initial Authentication
+   ↓
+   POST /oauth/token (grant_type=authorization_code)
+   ↓
+   Issues: { access_token (1h), refresh_token (30d) }
+
+2. Use Access Token (repeated API calls)
+   ↓
+   Authorization: Bearer abc123...
+   ↓
+   Valid for 1 hour
+
+3. Access Token Expires
+   ↓
+   ChatGPT automatically calls:
+   POST /oauth/token (grant_type=refresh_token)
+   ↓
+   Server validates refresh token
+   ↓
+   Issues: { new_access_token (1h), new_refresh_token (30d) }
+   ↓
+   Old refresh token is revoked (token rotation)
+
+4. Repeat Step 2-3 for up to 30 days
+
+5. Refresh Token Expires (after 30 days)
+   ↓
+   User must re-authenticate from scratch
+```
+
+### Refresh Token Implementation
+
+**Storage:**
+```typescript
+// In-memory storage (production should use Redis/database)
+const refreshTokens: Map<string, RefreshToken> = new Map();
+
+interface RefreshToken {
+  expiresAt: number;           // 30 days from issuance
+  clientId: string;
+  scope?: string;
+  resource?: string;           // Audience claim
+  accessToken?: string;        // Currently linked access token
+}
+```
+
+**Refresh Token Grant Handler:**
+```typescript
+// POST /oauth/token with grant_type=refresh_token
+if (grant_type === 'refresh_token') {
+  // 1. Validate refresh token
+  const validation = validateRefreshToken(refresh_token);
+  if (!validation.valid) {
+    return 401 Unauthorized;
+  }
+  
+  // 2. Verify client matches
+  if (validation.clientId !== client_id) {
+    return 401 Unauthorized;
+  }
+  
+  // 3. Revoke old refresh token (security best practice)
+  revokeRefreshToken(refresh_token);
+  
+  // 4. Generate new token pair
+  const { accessToken, refreshToken } = generateTokenPair(
+    client_id,
+    validation.scope,
+    validation.resource
+  );
+  
+  // 5. Return new tokens
+  return {
+    access_token: accessToken,
+    refresh_token: refreshToken,  // New refresh token!
+    expires_in: 3600
+  };
+}
+```
+
+**Security Features:**
+- ✅ Token rotation: Old refresh token is revoked on use
+- ✅ Client validation: Refresh token can only be used by issuing client
+- ✅ Scope preservation: New tokens maintain original scopes
+- ✅ Expiration: Refresh tokens expire after 30 days
+- ✅ Resource binding: Tokens are bound to specific resource (audience)
+
+### Resource Parameter Handling
+
+Per MCP spec, the `resource` parameter identifies the protected resource (your MCP server) and is echoed throughout the OAuth flow:
+
+```
+1. Authorization Request
+   GET /oauth/authorize?resource=https://your-app.railway.app&...
+   ↓
+   Server stores resource with authorization code
+
+2. Token Request
+   POST /oauth/token
+   {
+     "grant_type": "authorization_code",
+     "code": "abc123",
+     "resource": "https://your-app.railway.app"
+   }
+   ↓
+   Server validates resource matches authorization code
+   ↓
+   Embeds resource in access token (as audience claim)
+
+3. API Calls
+   Authorization: Bearer <access_token>
+   ↓
+   Server validates token audience matches its own URL
+```
+
+**Implementation:**
+```typescript
+// Generate tokens with resource
+const { accessToken, refreshToken } = generateTokenPair(
+  clientId,
+  scope,
+  resource  // ← Stored in token as audience
+);
+
+// Validate tokens
+if (token.resource !== expectedResource) {
+  return 401 Unauthorized; // Token not for this server
+}
+```
+
+### Tool Security Schemes
+
+Each MCP tool declares its authentication requirements via `securitySchemes`:
+
+```typescript
+// get_pending_reservations - Requires OAuth with calendar:read scope
+{
+  name: 'get_pending_reservations',
+  securitySchemes: [
+    { type: 'oauth2', scopes: ['calendar:read'] }
+  ]
+}
+
+// respond_to_invite - Requires OAuth with calendar:write scope
+{
+  name: 'respond_to_invite',
+  securitySchemes: [
+    { type: 'oauth2', scopes: ['calendar:write'] }
+  ]
+}
+
+// check_auth_status - No authentication required
+{
+  name: 'check_auth_status',
+  securitySchemes: [
+    { type: 'noauth' }
+  ]
+}
+```
+
+**Benefits:**
+- ChatGPT knows which tools require authentication
+- Clear scope requirements for each operation
+- Can mix authenticated and non-authenticated tools
+- Better security and UX (prompts only when needed)
+
+### WWW-Authenticate Headers
+
+When MCP requests fail due to missing/invalid auth, the server returns RFC 9728-compliant headers:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://your-app.railway.app/.well-known/oauth-protected-resource",
+                         error="insufficient_scope",
+                         error_description="Authentication required"
+```
+
+This tells ChatGPT:
+1. Where to find resource metadata
+2. Why the request failed
+3. How to fix it (initiate OAuth flow)
+
+### Dynamic Client Registration (DCR)
+
+**Endpoint:** `POST /oauth/register`
+
+```json
+// Request
+{
+  "client_name": "ChatGPT MCP Client",
+  "redirect_uris": [
+    "https://chatgpt.com/connector_platform_oauth_redirect",
+    "https://platform.openai.com/apps-manage/oauth"
+  ],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "client_secret_post"
+}
+
+// Response
+{
+  "client_id": "generated-client-id-123",
+  "client_secret": "generated-secret-456",
+  "client_id_issued_at": 1640000000,
+  "client_secret_expires_at": 0,  // Never expires
+  // ... echoes request fields
+}
+```
+
+**Note:** Currently, ChatGPT uses DCR per session. The MCP spec is moving toward Client Metadata Documents (CMID) for stable client identity.
+
+### Google Calendar Token Management
+
+Separate from MCP OAuth, the app manages Google OAuth tokens per user:
+
+**Automatic Refresh:**
+```typescript
+// Before every Google Calendar API call
+export async function getAuthorizedClient(userId: string): Promise<OAuth2Client> {
+  const tokens = getTokens(userId);
+  
+  // Check if token expires within 5 minutes
+  if (tokens.expiry_date - (5 * 60 * 1000) < Date.now()) {
+    // Auto-refresh
+    const newTokens = await refreshAccessToken(tokens.refresh_token);
+    updateTokens(userId, newTokens);
+  }
+  
+  return oauth2Client;
+}
+```
+
+**Storage:**
+```json
+// data/tokens.json
+{
+  "v1/user_id_hash": {
+    "tokens": {
+      "access_token": "ya29.a0...",
+      "refresh_token": "1//0g...",
+      "expiry_date": 1703012345000,
+      "scope": "https://www.googleapis.com/auth/calendar.events ...",
+      "token_type": "Bearer"
+    },
+    "email": "user@example.com",
+    "createdAt": "2024-01-01T00:00:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### PKCE (Proof Key for Code Exchange)
+
+The app supports PKCE (RFC 7636) for enhanced security in the authorization code flow:
+
+```
+1. Client generates code_verifier (random string)
+   ↓
+2. Client computes code_challenge = BASE64URL(SHA256(code_verifier))
+   ↓
+3. Authorization Request
+   GET /oauth/authorize?code_challenge=abc123&code_challenge_method=S256
+   ↓
+4. Server stores code_challenge with authorization code
+   ↓
+5. Token Request
+   POST /oauth/token
+   {
+     "code": "xyz789",
+     "code_verifier": "original_random_string"
+   }
+   ↓
+6. Server validates: SHA256(code_verifier) === stored_code_challenge
+   ↓
+7. If valid, issue tokens
+```
+
+**Security Benefit:** Even if authorization code is intercepted, attacker cannot exchange it for tokens without the `code_verifier`.
+
+### ChatGPT Production Redirect URIs
+
+The app whitelists ChatGPT's official redirect URIs:
+
+```typescript
+redirect_uris: [
+  'https://chatgpt.com/connector_platform_oauth_redirect',  // Production
+  'https://platform.openai.com/apps-manage/oauth',          // Review/testing
+  'https://chatgpt.com/aip/g-*/oauth/callback'              // Legacy pattern
+]
+```
 
 ---
 
@@ -847,10 +1243,12 @@ WIDGET_BASE_URL=https://your-app.railway.app
 1. Open ChatGPT → Settings → Personalization
 2. Add MCP server:
    - **Server URL**: `https://your-app.railway.app/mcp`
-   - **Authentication**: OAuth 2.0
+   - **Authentication**: OAuth 2.1
    - **Client ID**: `chatgpt-mcp-client` (from your MCP_OAUTH_CLIENT_ID)
    - **Client Secret**: `chatgpt-mcp-secret-key-2024` (from MCP_OAUTH_CLIENT_SECRET)
-   - **Token URL**: `https://your-app.railway.app/oauth/token`
+   - **Discovery URL**: `https://your-app.railway.app/.well-known/oauth-authorization-server` (auto-discovered)
+
+**Note:** ChatGPT will automatically discover all OAuth endpoints from the discovery URL. You don't need to manually configure token, authorization, or registration endpoints.
 
 ### Step 2: Test in ChatGPT
 
@@ -863,6 +1261,31 @@ Try these commands:
 - "Decline all meetings on Friday"
 
 The widget will automatically appear with your data!
+
+### Step 3: Verify OAuth 2.1 Implementation
+
+Test the OAuth flow:
+
+```bash
+# 1. Test discovery endpoint
+curl https://your-app.railway.app/.well-known/oauth-authorization-server
+
+# 2. Test protected resource metadata
+curl https://your-app.railway.app/.well-known/oauth-protected-resource
+
+# 3. Test token issuance
+curl -X POST https://your-app.railway.app/oauth/token \
+  -H "Content-Type: application/json" \
+  -d '{"grant_type":"client_credentials","client_id":"chatgpt-mcp-client","client_secret":"your-secret"}'
+
+# 4. Verify refresh token is included in response
+# Expected: { "access_token": "...", "refresh_token": "...", "expires_in": 3600 }
+
+# 5. Test refresh token grant
+curl -X POST https://your-app.railway.app/oauth/token \
+  -H "Content-Type: application/json" \
+  -d '{"grant_type":"refresh_token","refresh_token":"<token>","client_id":"chatgpt-mcp-client"}'
+```
 
 ---
 
@@ -947,22 +1370,47 @@ Instead of separate HTML files for each view, we use a single widget with React 
 1. Disconnect and reconnect MCP server in ChatGPT settings
 2. Verify server is running and accessible
 3. Check server logs for resource registration
+4. Verify widget is built: `cd widget && npm run build`
+5. Check `widget/dist/calendar-widget.html` exists
 
-### OAuth "redirect_uri_mismatch"
+### OAuth Discovery Issues
+
+**Problem:** ChatGPT fails to connect with "Discovery endpoint not found"  
+**Solution:**
+1. Verify `/.well-known/oauth-authorization-server` is accessible
+   ```bash
+   curl https://your-app.railway.app/.well-known/oauth-authorization-server
+   ```
+2. Ensure `/.well-known/oauth-protected-resource` returns valid JSON
+3. Check server logs for discovery endpoint hits
+4. Verify HTTPS is enabled (required for production)
+
+### MCP OAuth Token Refresh Failures
+
+**Problem:** "Invalid or expired refresh token"  
+**Solution:**
+1. Check if refresh tokens are being generated (should see `refresh_token` in `/oauth/token` response)
+2. Verify refresh token expiry (30 days default)
+3. Check server logs for refresh token validation errors
+4. Ensure `grant_types_supported` includes `"refresh_token"` in discovery endpoint
+
+### Google OAuth "redirect_uri_mismatch"
 
 **Problem:** Google OAuth fails with redirect URI error  
 **Solution:**
 1. Ensure `.env` GOOGLE_REDIRECT_URI exactly matches Google Cloud Console
 2. Check for trailing slashes
 3. Verify protocol (http vs https)
+4. Add both development and production URIs to Google Console
 
-### Token Refresh Errors
+### Google Token Refresh Errors
 
 **Problem:** "Access token expired and no refresh token available"  
 **Solution:**
 1. Delete `data/tokens.json`
 2. Re-authenticate in ChatGPT
 3. Ensure OAuth consent includes `access_type: 'offline'`
+4. Verify Google OAuth scopes include `calendar.events`
 
 ### Widget Shows White Screen
 
@@ -971,6 +1419,8 @@ Instead of separate HTML files for each view, we use a single widget with React 
 1. Check browser console for CSP errors
 2. Verify `openai/widgetCSP` configuration in `mcp-server.ts`
 3. Ensure widget HTML is valid and bundled correctly
+4. Check `connect_domains` includes ChatGPT URLs
+5. Verify React bundle loaded (check Network tab)
 
 ### Multi-User Issues
 
@@ -979,6 +1429,35 @@ Instead of separate HTML files for each view, we use a single widget with React 
 1. Verify `openai/subject` is being extracted correctly
 2. Check server logs for user ID in tool calls
 3. Ensure token-store is using user ID as key
+4. Test with two different ChatGPT accounts simultaneously
+
+### PKCE Validation Errors
+
+**Problem:** "Invalid code verifier" during token exchange  
+**Solution:**
+1. Ensure `code_challenge_method` is `S256` (not `plain`)
+2. Verify code verifier is properly base64url encoded
+3. Check authorization code hasn't expired (10 minutes)
+4. Don't try to reuse authorization codes (single-use only)
+
+### 401 Unauthorized on MCP Requests
+
+**Problem:** All MCP requests return 401  
+**Solution:**
+1. Check `Authorization: Bearer <token>` header is present
+2. Verify token hasn't expired (1 hour)
+3. Check WWW-Authenticate response header for details
+4. Test token endpoint: `curl -X POST .../oauth/token`
+5. Verify client credentials are correct
+
+### Resource Parameter Mismatch
+
+**Problem:** "Token audience does not match resource"  
+**Solution:**
+1. Ensure `resource` parameter is consistent across OAuth flow
+2. Check token issuance logs for resource value
+3. Verify server's base URL matches expected resource
+4. Use `getBaseUrl(req)` helper for dynamic detection
 
 ---
 
@@ -986,10 +1465,19 @@ Instead of separate HTML files for each view, we use a single widget with React 
 
 ### Token Storage
 
-- Tokens stored in JSON file (suitable for MVP/small deployments)
+**Google Calendar Tokens:**
+- Stored in JSON file (`data/tokens.json`) - suitable for MVP/small deployments
 - For production: Consider Redis or encrypted database
 - Automatic cleanup of expired tokens
-- Per-user isolation
+- Per-user isolation with user ID as key
+
+**MCP OAuth Tokens:**
+- Stored in-memory (Map) - fast but not persistent across restarts
+- Suitable for development and testing
+- For production: Implement persistent storage (Redis recommended)
+- Access tokens: 1-hour expiry
+- Refresh tokens: 30-day expiry with automatic rotation
+- Automatic cleanup of expired tokens
 
 ### OAuth Flow
 
@@ -1008,12 +1496,17 @@ Instead of separate HTML files for each view, we use a single widget with React 
 }
 ```
 
-### MCP OAuth
+### MCP OAuth 2.1
 
 - Bearer token authentication for all MCP requests
 - Client credentials validation
-- Authorization code flow with PKCE
+- Authorization code flow with PKCE (S256)
 - Dynamic client registration support
+- Refresh token issuance and rotation
+- Resource parameter handling (audience claims)
+- Discovery endpoints (RFC 8414, RFC 9728)
+- Token expiration: Access tokens (1h), Refresh tokens (30d)
+- Automatic token cleanup
 
 ---
 
@@ -1078,9 +1571,22 @@ Instead of separate HTML files for each view, we use a single widget with React 
 
 ## Future Enhancements
 
-### Potential Features
+### Completed Features ✅
 
-- [ ] **Database Storage** - PostgreSQL/MongoDB instead of JSON
+- [x] **OAuth 2.1 Compliance** - Full MCP authorization spec with refresh tokens
+- [x] **Refresh Token Support** - Long-lived sessions with automatic rotation
+- [x] **Discovery Endpoints** - RFC 8414 and RFC 9728 compliant
+- [x] **Security Schemes** - Per-tool authentication requirements
+- [x] **Resource Parameter** - Proper audience handling
+- [x] **Multi-User Support** - Isolated authentication per ChatGPT user
+- [x] **Modern UI** - 3D card effects with dark mode support
+
+### Potential Future Features
+
+- [ ] **Persistent Token Storage** - Redis/PostgreSQL instead of in-memory for MCP tokens
+- [ ] **Token Introspection** - RFC 7662 token introspection endpoint
+- [ ] **Token Revocation** - RFC 7009 token revocation endpoint
+- [ ] **Database Storage** - PostgreSQL/MongoDB for Google tokens
 - [ ] **Calendar Sync** - Two-way sync with Google Calendar
 - [ ] **Notifications** - Alert when new invites arrive
 - [ ] **Bulk Actions** - Accept/decline multiple invites at once
@@ -1090,6 +1596,7 @@ Instead of separate HTML files for each view, we use a single widget with React 
 - [ ] **Analytics** - Track response patterns and insights
 - [ ] **Reminder Settings** - Configure invite reminder preferences
 - [ ] **Mobile Optimization** - Better mobile widget experience
+- [ ] **CMID Support** - Client Metadata Documents for stable client identity
 
 ---
 
@@ -1110,6 +1617,35 @@ For issues, questions, or contributions:
 
 ---
 
+## OAuth 2.1 Compliance Summary
+
+This application fully implements the **MCP Authorization Specification** as required by OpenAI's Apps SDK:
+
+| Requirement | Status | Implementation |
+|------------|--------|----------------|
+| **Protected Resource Metadata** | ✅ | `GET /.well-known/oauth-protected-resource` |
+| **OAuth Server Metadata** | ✅ | `GET /.well-known/oauth-authorization-server` |
+| **PKCE Support (S256)** | ✅ | Authorization code flow with code challenges |
+| **Refresh Token Issuance** | ✅ | All token grants return refresh tokens |
+| **Refresh Token Grant** | ✅ | `grant_type=refresh_token` supported |
+| **Token Rotation** | ✅ | Old refresh tokens revoked on use |
+| **Resource Parameter** | ✅ | Echoed through flow, stored as audience |
+| **WWW-Authenticate Headers** | ✅ | RFC 9728 compliant 401 responses |
+| **Security Schemes** | ✅ | Per-tool auth requirements declared |
+| **Dynamic Client Registration** | ✅ | `POST /oauth/register` (RFC 7591) |
+| **Scope Support** | ✅ | `calendar:read`, `calendar:write`, `mcp` |
+| **Token Expiration** | ✅ | Access: 1h, Refresh: 30d |
+| **Multi-User Support** | ✅ | Per-user token isolation via `openai/subject` |
+
+**References:**
+- [MCP Authorization Spec](https://spec.modelcontextprotocol.io/specification/2024-11-05/authentication/)
+- [OpenAI Apps SDK - Authentication](https://developers.openai.com/apps-sdk/build/auth)
+- [RFC 8414 - OAuth 2.0 Authorization Server Metadata](https://www.rfc-editor.org/rfc/rfc8414.html)
+- [RFC 9728 - OAuth 2.0 Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728.html)
+- [RFC 7636 - PKCE](https://www.rfc-editor.org/rfc/rfc7636.html)
+
+---
+
 ## Credits
 
 Built with:
@@ -1120,6 +1656,15 @@ Built with:
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Vite](https://vitejs.dev/)
 
+**OAuth 2.1 Compliance:**
+- Implements [MCP Authorization Specification](https://spec.modelcontextprotocol.io/specification/2024-11-05/authentication/)
+- Follows [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html) (OAuth Server Metadata)
+- Follows [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728.html) (OAuth Protected Resource Metadata)
+- Supports [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636.html) (PKCE)
+- Supports [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591.html) (Dynamic Client Registration)
+
 ---
 
 **Happy Calendar Managing! 🗓️✨**
+
+*This app demonstrates a production-ready implementation of OAuth 2.1 for ChatGPT integrations with full MCP spec compliance, refresh token support, and multi-user isolation.*

@@ -92,6 +92,7 @@ interface AppsTool {
     required: string[];
     additionalProperties?: boolean;
   };
+  securitySchemes?: Array<{ type: string; scopes?: string[] }>;
   _meta: {
     'openai/outputTemplate': string;
     'openai/visibility'?: 'public' | 'private';
@@ -124,6 +125,9 @@ function getTools(): AppsTool[] {
         required: [],
         additionalProperties: false,
       },
+      securitySchemes: [
+        { type: 'oauth2', scopes: ['calendar:read'] },
+      ],
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
         'openai/visibility': 'public',
@@ -150,6 +154,9 @@ function getTools(): AppsTool[] {
         required: ['event_id', 'response'],
         additionalProperties: false,
       },
+      securitySchemes: [
+        { type: 'oauth2', scopes: ['calendar:write'] },
+      ],
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
         'openai/visibility': 'public',
@@ -166,6 +173,9 @@ function getTools(): AppsTool[] {
         required: [],
         additionalProperties: false,
       },
+      securitySchemes: [
+        { type: 'noauth' },
+      ],
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
         'openai/visibility': 'public', // Hidden from ChatGPT UI - users use get_pending_reservations instead

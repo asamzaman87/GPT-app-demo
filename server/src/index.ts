@@ -42,9 +42,12 @@ import {
   validateClientCredentials,
   validateClientId,
   generateAccessToken,
+  generateTokenPair,
   generateAuthorizationCode,
   validateAccessToken,
   validateAuthorizationCode,
+  validateRefreshToken,
+  revokeRefreshToken,
   extractBearerToken,
   getTokenResponse,
   getOAuthCredentials,
@@ -343,9 +346,9 @@ app.get('/.well-known/oauth-authorization-server', (req: Request, res: Response)
     token_endpoint: `${baseUrl}/oauth/token`,
     registration_endpoint: `${baseUrl}/oauth/register`,
     token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic', 'none'],
-    grant_types_supported: ['authorization_code', 'client_credentials'],
+    grant_types_supported: ['authorization_code', 'client_credentials', 'refresh_token'],
     response_types_supported: ['code'],
-    scopes_supported: ['openid', 'profile', 'email', 'mcp'],
+    scopes_supported: ['calendar:read', 'calendar:write', 'mcp'],
     code_challenge_methods_supported: ['S256'],
     service_documentation: `${baseUrl}/docs`,
   });
@@ -361,9 +364,9 @@ app.get('/.well-known/openid-configuration', (req: Request, res: Response) => {
     token_endpoint: `${baseUrl}/oauth/token`,
     registration_endpoint: `${baseUrl}/oauth/register`,
     token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic', 'none'],
-    grant_types_supported: ['authorization_code', 'client_credentials'],
+    grant_types_supported: ['authorization_code', 'client_credentials', 'refresh_token'],
     response_types_supported: ['code'],
-    scopes_supported: ['openid', 'profile', 'email', 'mcp'],
+    scopes_supported: ['calendar:read', 'calendar:write', 'mcp'],
     subject_types_supported: ['public'],
     id_token_signing_alg_values_supported: ['RS256'],
     code_challenge_methods_supported: ['S256'],
@@ -375,10 +378,11 @@ app.get('/.well-known/oauth-protected-resource', (req: Request, res: Response) =
   const baseUrl = getBaseUrl(req);
   
   res.json({
-    resource: `${baseUrl}/mcp`,
+    resource: baseUrl,
     authorization_servers: [baseUrl],
-    scopes_supported: ['mcp'],
+    scopes_supported: ['calendar:read', 'calendar:write', 'mcp'],
     bearer_methods_supported: ['header'],
+    resource_documentation: `${baseUrl}/docs`,
   });
 });
 
@@ -408,7 +412,8 @@ app.get('/oauth/authorize', (req: Request, res: Response) => {
     state, 
     code_challenge, 
     code_challenge_method,
-    scope 
+    scope,
+    resource
   } = req.query;
   
   // Validate client
@@ -433,16 +438,17 @@ app.get('/oauth/authorize', (req: Request, res: Response) => {
     });
   }
   
-  // Generate authorization code with PKCE support
+  // Generate authorization code with PKCE support and resource parameter
   const authCode = generateAuthorizationCode(
     client_id as string,
     redirect_uri as string,
     code_challenge as string | undefined,
     code_challenge_method as string | undefined,
-    scope as string | undefined
+    scope as string | undefined,
+    resource as string | undefined
   );
   
-  console.log(`Authorization code generated for client: ${client_id}`);
+  console.log(`Authorization code generated for client: ${client_id}${resource ? ` (resource: ${resource})` : ''}`);
   
   // Redirect back with code
   const redirectUrl = new URL(redirect_uri as string);
@@ -458,7 +464,7 @@ app.get('/oauth/authorize', (req: Request, res: Response) => {
 // MCP OAuth Token Endpoint (for ChatGPT authentication)
 // ============================================
 app.post('/oauth/token', (req: Request, res: Response) => {
-  const { grant_type, client_id, client_secret, code, redirect_uri, code_verifier } = req.body;
+  const { grant_type, client_id, client_secret, code, redirect_uri, code_verifier, refresh_token, resource } = req.body;
 
   // Also check Authorization header for client credentials
   let authClientId = client_id;
@@ -504,11 +510,62 @@ app.post('/oauth/token', (req: Request, res: Response) => {
       });
     }
     
-    // Generate new access token
-    const accessToken = generateAccessToken(authClientId || 'chatgpt');
-    const tokenResponse = getTokenResponse(accessToken);
+    // Use resource from validation (stored in auth code) or from request body
+    const tokenResource = validation.resource || resource;
     
-    console.log('OAuth token issued via authorization_code for client:', authClientId);
+    // Generate new access token and refresh token
+    const { accessToken, refreshToken } = generateTokenPair(
+      authClientId || 'chatgpt',
+      validation.scope,
+      tokenResource
+    );
+    const tokenResponse = getTokenResponse(accessToken, refreshToken, validation.scope);
+    
+    console.log('OAuth token issued via authorization_code for client:', authClientId, tokenResource ? `(resource: ${tokenResource})` : '');
+    res.json(tokenResponse);
+    return;
+  }
+
+  // Handle refresh_token grant type
+  if (grant_type === 'refresh_token') {
+    if (!refresh_token) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Missing refresh_token',
+      });
+    }
+    
+    // Validate the refresh token
+    const validation = validateRefreshToken(refresh_token);
+    
+    if (!validation.valid) {
+      return res.status(401).json({
+        error: 'invalid_grant',
+        error_description: validation.error || 'Invalid or expired refresh token',
+      });
+    }
+    
+    // Verify client matches
+    if (validation.clientId !== authClientId) {
+      return res.status(401).json({
+        error: 'invalid_grant',
+        error_description: 'Client ID mismatch',
+      });
+    }
+    
+    // Revoke old refresh token
+    revokeRefreshToken(refresh_token);
+    
+    // Generate new access token and refresh token (token rotation)
+    const tokenResource = validation.resource || resource;
+    const { accessToken, refreshToken: newRefreshToken } = generateTokenPair(
+      authClientId || 'chatgpt',
+      validation.scope,
+      tokenResource
+    );
+    const tokenResponse = getTokenResponse(accessToken, newRefreshToken, validation.scope);
+    
+    console.log('OAuth token refreshed for client:', authClientId);
     res.json(tokenResponse);
     return;
   }
@@ -523,9 +580,9 @@ app.post('/oauth/token', (req: Request, res: Response) => {
       });
     }
 
-    // Generate and return access token
-    const accessToken = generateAccessToken(authClientId);
-    const tokenResponse = getTokenResponse(accessToken);
+    // Generate and return access token and refresh token
+    const { accessToken, refreshToken } = generateTokenPair(authClientId, undefined, resource);
+    const tokenResponse = getTokenResponse(accessToken, refreshToken);
     
     console.log('OAuth token issued via client_credentials for client:', authClientId);
     res.json(tokenResponse);
@@ -535,7 +592,7 @@ app.post('/oauth/token', (req: Request, res: Response) => {
   // Unsupported grant type
   return res.status(400).json({
     error: 'unsupported_grant_type',
-    error_description: 'Supported grant types: client_credentials, authorization_code',
+    error_description: 'Supported grant types: authorization_code, client_credentials, refresh_token',
   });
 });
 
@@ -562,7 +619,10 @@ app.post('/mcp', async (req: Request, res: Response) => {
     // Return 401 with WWW-Authenticate header per RFC 9728
     // This tells the client where to get authorization
     const requestId = req.body.id !== undefined ? req.body.id : null;
-    res.setHeader('WWW-Authenticate', `Bearer resource="${baseUrl}/mcp", as_uri="${baseUrl}"`);
+    res.setHeader(
+      'WWW-Authenticate', 
+      `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource", error="insufficient_scope", error_description="Authentication required"`
+    );
     return res.status(401).json({
       jsonrpc: '2.0',
       error: { 
@@ -570,7 +630,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
         message: 'Unauthorized: Invalid or missing access token',
         data: {
           authorizationServer: baseUrl,
-          resource: `${baseUrl}/mcp`,
+          resource: baseUrl,
         }
       },
       id: requestId,

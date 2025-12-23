@@ -27,6 +27,16 @@ interface IssuedToken {
   expiresAt: number;
   clientId: string;
   scope?: string;
+  refreshToken?: string; // Link to refresh token
+  resource?: string; // Resource parameter (audience)
+}
+
+interface RefreshToken {
+  expiresAt: number;
+  clientId: string;
+  scope?: string;
+  accessToken?: string; // Currently linked access token
+  resource?: string; // Resource parameter (audience)
 }
 
 interface AuthorizationCode {
@@ -36,6 +46,7 @@ interface AuthorizationCode {
   codeChallengeMethod?: string;
   expiresAt: number;
   scope?: string;
+  resource?: string; // Resource parameter (audience)
 }
 
 // ============================================
@@ -48,11 +59,17 @@ const registeredClients: Map<string, RegisteredClient> = new Map();
 // Issued access tokens
 const issuedTokens: Map<string, IssuedToken> = new Map();
 
+// Issued refresh tokens
+const refreshTokens: Map<string, RefreshToken> = new Map();
+
 // Authorization codes (for auth code flow)
 const authorizationCodes: Map<string, AuthorizationCode> = new Map();
 
 // Token expiration time (1 hour)
 const TOKEN_EXPIRY_MS = 60 * 60 * 1000;
+
+// Refresh token expiration (30 days)
+const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Auth code expiration (10 minutes)
 const AUTH_CODE_EXPIRY_MS = 10 * 60 * 1000;
@@ -78,8 +95,8 @@ function initializeDefaultClient(): void {
       client_id: clientId,
       client_secret: clientSecret,
       client_name: 'Default MCP Client',
-      redirect_uris: ['https://chatgpt.com/aip/g-*/oauth/callback'],
-      grant_types: ['authorization_code', 'client_credentials'],
+      redirect_uris: ['https://chatgpt.com/aip/g-*/oauth/callback', 'https://chatgpt.com/connector_platform_oauth_redirect', 'https://platform.openai.com/apps-manage/oauth'],
+      grant_types: ['authorization_code', 'client_credentials', 'refresh_token'],
       response_types: ['code'],
       token_endpoint_auth_method: 'client_secret_post',
       created_at: Date.now(),
@@ -197,7 +214,8 @@ export function generateAuthorizationCode(
   redirectUri: string,
   codeChallenge?: string,
   codeChallengeMethod?: string,
-  scope?: string
+  scope?: string,
+  resource?: string
 ): string {
   const code = crypto.randomBytes(32).toString('hex');
   
@@ -208,6 +226,7 @@ export function generateAuthorizationCode(
     codeChallengeMethod,
     expiresAt: Date.now() + AUTH_CODE_EXPIRY_MS,
     scope,
+    resource,
   });
   
   return code;
@@ -221,7 +240,7 @@ export function validateAuthorizationCode(
   clientId: string,
   redirectUri: string,
   codeVerifier?: string
-): { valid: boolean; error?: string } {
+): { valid: boolean; error?: string; scope?: string; resource?: string } {
   const authCode = authorizationCodes.get(code);
   
   if (!authCode) {
@@ -259,26 +278,60 @@ export function validateAuthorizationCode(
   // Consume the code (one-time use)
   authorizationCodes.delete(code);
   
-  return { valid: true };
+  return { valid: true, scope: authCode.scope, resource: authCode.resource };
 }
 
 // ============================================
-// Access Tokens
+// Access Tokens & Refresh Tokens
 // ============================================
 
 /**
- * Generate an access token
+ * Generate an access token (legacy - for backward compatibility)
  */
-export function generateAccessToken(clientId: string, scope?: string): string {
-  const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = Date.now() + TOKEN_EXPIRY_MS;
+export function generateAccessToken(clientId: string, scope?: string, resource?: string): string {
+  const { accessToken } = generateTokenPair(clientId, scope, resource);
+  return accessToken;
+}
+
+/**
+ * Generate both access token and refresh token
+ */
+export function generateTokenPair(
+  clientId: string, 
+  scope?: string,
+  resource?: string
+): { 
+  accessToken: string; 
+  refreshToken: string;
+} {
+  const accessToken = crypto.randomBytes(32).toString('hex');
+  const refreshToken = crypto.randomBytes(32).toString('hex');
   
-  issuedTokens.set(token, { expiresAt, clientId, scope });
+  const accessExpiresAt = Date.now() + TOKEN_EXPIRY_MS;
+  const refreshExpiresAt = Date.now() + REFRESH_TOKEN_EXPIRY_MS;
+  
+  // Store access token with link to refresh token
+  issuedTokens.set(accessToken, { 
+    expiresAt: accessExpiresAt, 
+    clientId, 
+    scope,
+    resource,
+    refreshToken 
+  });
+  
+  // Store refresh token with link to access token
+  refreshTokens.set(refreshToken, { 
+    expiresAt: refreshExpiresAt, 
+    clientId, 
+    scope,
+    resource,
+    accessToken 
+  });
   
   // Clean up expired tokens periodically
   cleanupExpiredTokens();
   
-  return token;
+  return { accessToken, refreshToken };
 }
 
 /**
@@ -300,15 +353,70 @@ export function validateAccessToken(token: string): boolean {
 }
 
 /**
+ * Validate a refresh token and return its data
+ */
+export function validateRefreshToken(token: string): { 
+  valid: boolean; 
+  clientId?: string; 
+  scope?: string;
+  resource?: string;
+  error?: string;
+} {
+  const tokenData = refreshTokens.get(token);
+  
+  if (!tokenData) {
+    return { valid: false, error: 'Invalid refresh token' };
+  }
+  
+  if (Date.now() > tokenData.expiresAt) {
+    refreshTokens.delete(token);
+    return { valid: false, error: 'Refresh token expired' };
+  }
+  
+  return { 
+    valid: true, 
+    clientId: tokenData.clientId, 
+    scope: tokenData.scope,
+    resource: tokenData.resource
+  };
+}
+
+/**
+ * Revoke a refresh token and its linked access token
+ */
+export function revokeRefreshToken(token: string): void {
+  const tokenData = refreshTokens.get(token);
+  
+  if (tokenData && tokenData.accessToken) {
+    // Revoke the linked access token
+    issuedTokens.delete(tokenData.accessToken);
+  }
+  
+  // Revoke the refresh token
+  refreshTokens.delete(token);
+}
+
+/**
  * Clean up expired tokens
  */
 function cleanupExpiredTokens(): void {
   const now = Date.now();
+  
+  // Clean up expired access tokens
   for (const [token, data] of issuedTokens.entries()) {
     if (now > data.expiresAt) {
       issuedTokens.delete(token);
     }
   }
+  
+  // Clean up expired refresh tokens
+  for (const [token, data] of refreshTokens.entries()) {
+    if (now > data.expiresAt) {
+      refreshTokens.delete(token);
+    }
+  }
+  
+  // Clean up expired auth codes
   for (const [code, data] of authorizationCodes.entries()) {
     if (now > data.expiresAt) {
       authorizationCodes.delete(code);
@@ -331,18 +439,24 @@ export function extractBearerToken(authHeader: string | undefined): string | nul
 }
 
 /**
- * Get token response
+ * Get token response (with refresh token)
  */
-export function getTokenResponse(accessToken: string, scope?: string): {
+export function getTokenResponse(
+  accessToken: string, 
+  refreshToken: string,
+  scope?: string
+): {
   access_token: string;
   token_type: string;
   expires_in: number;
+  refresh_token: string;
   scope?: string;
 } {
   const response: any = {
     access_token: accessToken,
     token_type: 'Bearer',
     expires_in: Math.floor(TOKEN_EXPIRY_MS / 1000),
+    refresh_token: refreshToken,
   };
   
   if (scope) {
