@@ -121,10 +121,7 @@ export function DateRangeSelector({ isDark, isRefreshing, onRangeChange }: DateR
           onChange={(e) => handleQuickRange(e.target.value as any)}
           disabled={isRefreshing}
           className={`w-full px-3 py-2 text-sm rounded-lg border ${
-            isDark 
-              ? 'bg-slate-800 border-slate-600 text-white' 
-              : 'bg-white border-slate-300 text-slate-900'
-          }`}
+            theme.card(isDark)} ${theme.textPrimary(isDark)}`}
         >
           <option value="next-2-weeks">Next 2 Weeks (Default)</option>
           <option value="past-week">Past Week</option>

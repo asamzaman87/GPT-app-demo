@@ -25,7 +25,7 @@ export const theme = {
     'hover:shadow-xl transition-all duration-200 border shadow-md ',
 
   buttonBorder: (isDark: boolean) =>
-    isDark ? "border-gray-200" : "border-gray-200",
+    isDark ? "border-white" : "border-gray-200",
 
   // Icon chips
   iconBg: (isDark: boolean) =>
