@@ -94,7 +94,7 @@ interface AppsTool {
   };
   securitySchemes?: Array<{ type: string; scopes?: string[] }>;
   _meta: {
-    'openai/outputTemplate': string;
+    'openai/outputTemplate'?: string;
     'openai/visibility'?: 'public' | 'private';
     'openai/widgetAccessible'?: boolean;
   };
@@ -158,7 +158,6 @@ function getTools(): AppsTool[] {
         { type: 'oauth2', scopes: ['calendar:write'] },
       ],
       _meta: {
-        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
         'openai/visibility': 'public',
         'openai/widgetAccessible': false,
       },
@@ -177,8 +176,8 @@ function getTools(): AppsTool[] {
         { type: 'noauth' },
       ],
       _meta: {
-        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
-        'openai/visibility': 'public', // Hidden from ChatGPT UI - users use get_pending_reservations instead
+        // 'openai/outputTemplate': 'ui://widget/calendar-widget.html',
+        'openai/visibility': 'private', // Hidden from ChatGPT - only widget can call this
         'openai/widgetAccessible': true, // Widget can still call this for polling auth status
       },
     },
@@ -293,9 +292,6 @@ async function handleRespondToInvite(
         eventId: args.event_id,
         message: result.message,
         eventSummary: result.eventSummary,
-      },
-      _meta: {
-        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
       },
       isError: false,
     };
