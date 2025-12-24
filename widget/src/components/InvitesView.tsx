@@ -12,9 +12,11 @@ interface InviteCardProps {
   invite: PendingInvite;
   onRespond: (eventId: string, eventTitle: string, response: string) => Promise<void>;
   isDark: boolean;
+  index: number;
+  total: number;
 }
 
-function InviteCard({ invite, onRespond, isDark }: InviteCardProps) {
+function InviteCard({ invite, onRespond, isDark, index, total }: InviteCardProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'accepted' | 'declined' | 'tentative' | 'error'>('idle');
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -55,7 +57,12 @@ function InviteCard({ invite, onRespond, isDark }: InviteCardProps) {
       {/* Header: Title and Status Badge */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
-          <h3 className={`font-semibold ${theme.textPrimary(isDark)}`}>{invite.summary}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className={`font-semibold ${theme.textPrimary(isDark)}`}>{invite.summary}</h3>
+            <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${theme.card(isDark)} ${theme.textPrimary(isDark)} ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}>
+              {index}/{total}
+            </span>
+          </div>
         </div>
         <Badge color='success' className={`bg-green-600 text-white ${theme.textPrimary(isDark)} p-2 shrink-0`}>Pending</Badge>
       </div>
@@ -283,8 +290,15 @@ export function InvitesView() {
             </div>
           )}
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
-            {invites.map((invite) => (
-              <InviteCard key={invite.eventId} invite={invite} onRespond={handleRespond} isDark={isDark} />
+            {invites.map((invite, idx) => (
+              <InviteCard 
+                key={invite.eventId} 
+                invite={invite} 
+                onRespond={handleRespond} 
+                isDark={isDark}
+                index={idx + 1}
+                total={invites.length}
+              />
             ))}
           </div>
         </div>
