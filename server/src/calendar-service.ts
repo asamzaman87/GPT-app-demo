@@ -45,7 +45,7 @@ function formatDateTime(start: { dateTime?: string | null; date?: string | null 
  * Convert a Google Calendar event to our PendingInvite format
  */
 function eventToPendingInvite(event: calendar_v3.Schema$Event, userEmail: string): PendingInvite | null {
-  if (!event.id || !event.summary) {
+  if (!event.id) {
     return null;
   }
   
@@ -70,7 +70,7 @@ function eventToPendingInvite(event: calendar_v3.Schema$Event, userEmail: string
   
   return {
     eventId: event.id,
-    summary: event.summary,
+    summary: event.summary || '(No title)',
     description: event.description || null,
     location: event.location || null,
     startTime: startInfo.formatted,

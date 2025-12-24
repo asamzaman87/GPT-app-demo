@@ -58,7 +58,7 @@ function InviteCard({ invite, onRespond, isDark, index, total }: InviteCardProps
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className={`font-semibold ${theme.textPrimary(isDark)}`}>{invite.summary}</h3>
+            <h3 className={`font-semibold ${theme.textPrimary(isDark)}`}>{invite.summary || '(No title)'}</h3>
             <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${theme.card(isDark)} ${theme.textPrimary(isDark)} ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}>
               {index}/{total}
             </span>
