@@ -373,6 +373,18 @@ app.get('/.well-known/openid-configuration', (req: Request, res: Response) => {
   });
 });
 
+// OpenAI Domain Verification
+app.get('/.well-known/openai-apps-challenge', (req: Request, res: Response) => {
+  // Return the exact verification token provided by OpenAI
+  const verificationToken = process.env.OPENAI_VERIFICATION_TOKEN || '';
+  
+  if (!verificationToken) {
+    return res.status(404).send('Verification token not configured');
+  }
+  
+  res.type('text/plain').send(verificationToken);
+});
+
 // Protected Resource Metadata (RFC 9728) - Required for MCP
 app.get('/.well-known/oauth-protected-resource', (req: Request, res: Response) => {
   const baseUrl = getBaseUrl(req);
