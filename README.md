@@ -14,6 +14,73 @@ A ChatGPT app that helps you manage pending Google Calendar invitations directly
 - 🔄 **Real-time Updates** - Refresh invites on-demand with a single click
 - 🚀 **Single-Page Widget** - Unified React Router-based interface for seamless navigation
 - 🛡️ **OAuth 2.1 Compliant** - Full MCP authorization spec with PKCE, refresh tokens, and discovery endpoints
+- 🧪 **Demo Mode** - Test mode with mock calendar data for reviewers (no Google account required)
+
+---
+
+## Demo Mode (For Reviewers)
+
+This app includes a demo mode that allows OpenAI reviewers and testers to explore the functionality without connecting a real Google Calendar account.
+
+### Enabling Demo Mode
+
+Set these environment variables in your `.env` file:
+
+```env
+ENABLE_TEST_MODE=true
+TEST_USERNAME=demo_user
+TEST_PASSWORD=demo_pass_2024
+```
+
+### What Demo Mode Provides
+
+When `ENABLE_TEST_MODE=true` is set, the entire app switches to demo mode:
+
+**🎯 Universal Demo Mode:**
+- **ALL users automatically use mock data** (no Google OAuth required)
+- Works for both widget interactions AND ChatGPT conversations
+- Perfect for OpenAI reviewers testing the full app experience
+
+**🎨 Widget Features:**
+- A "Use Test Account" button appears on the authentication screen
+- Users can log in with test credentials for UI testing
+- Optional demo form (username/password) for manual testing
+
+**📅 Mock Data:**
+- **6 realistic calendar invites** spanning the next 10 days
+- Various meeting types (standups, reviews, presentations, etc.)
+- Multiple attendees with different response statuses
+- Descriptions, locations, and time information
+- Full CRUD operations that respond instantly
+
+**💬 ChatGPT Conversation Support:**
+- All MCP tool calls return mock data automatically
+- Natural language commands work: "show my invites", "accept all meetings"
+- `get_pending_reservations`, `respond_to_invite`, `batch_respond_to_invites` all work
+- No authentication prompts - users are treated as pre-authenticated
+
+### Using Demo Mode
+
+**Option A: ChatGPT Natural Language (Recommended for Reviewers)**
+1. Set `ENABLE_TEST_MODE=true` in environment
+2. Ask ChatGPT: "Show my pending calendar invites"
+3. ChatGPT will display 6 mock invites automatically
+4. Accept/decline invites via conversation: "Accept the Team Standup Meeting"
+
+**Option B: Widget UI Testing**
+1. Open the widget in ChatGPT
+2. Click "Use Test Account"
+3. Enter credentials: `demo_user` / `demo_pass_2024`
+4. Explore all features with mock data
+
+**Benefits:**
+✅ No Google Cloud Console setup required  
+✅ No OAuth credentials needed  
+✅ Instant access to mock calendar data  
+✅ Full feature testing (widget + conversations)  
+✅ Safe for OpenAI app review process  
+
+This allows reviewers to fully test the app's functionality without needing to set up Google OAuth credentials or connect a real calendar account. Simply enable test mode and the entire app uses mock data for all users.
 
 ---
 
@@ -1099,6 +1166,16 @@ MCP_OAUTH_CLIENT_SECRET=chatgpt-mcp-secret-key-2024
 # Widget Base URL (for CSP and resource loading)
 # Optional - auto-detected from request in development
 WIDGET_BASE_URL=https://your-app.railway.app
+
+# OpenAI Domain Verification Token (for app submission)
+# Get this from the OpenAI developer console during app submission
+OPENAI_VERIFICATION_TOKEN=your_verification_token_here
+
+# Demo/Test Mode Configuration (Optional)
+# Set to 'true' to enable demo login for reviewers/testing without Google OAuth
+ENABLE_TEST_MODE=false
+TEST_USERNAME=demo_user
+TEST_PASSWORD=demo_pass_2024
 ```
 
 ---

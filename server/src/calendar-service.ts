@@ -7,6 +7,7 @@ import {
   CalendarEvent,
   CalendarAttendee,
 } from './types.js';
+import { getDemoInvites, isDemoUser } from './demo-data.js';
 
 /**
  * Get a Calendar API client for a user
@@ -137,6 +138,40 @@ export async function getPendingInvites(
   startDate?: string,
   endDate?: string
 ): Promise<PendingInvitesResponse> {
+  // Check if test mode is enabled - return mock data for ALL users
+  const TEST_MODE_ENABLED = process.env.ENABLE_TEST_MODE === 'true';
+  
+  if (TEST_MODE_ENABLED || isDemoUser(userId)) {
+    const now = new Date();
+    const defaultEnd = new Date(now);
+    defaultEnd.setDate(defaultEnd.getDate() + 14);
+    
+    const timeMin = startDate || now.toISOString();
+    const timeMax = endDate || defaultEnd.toISOString();
+    
+    const demoInvites = getDemoInvites();
+    
+    // Filter demo invites by date range if specified
+    const filteredInvites = demoInvites.filter(invite => {
+      const inviteDate = new Date(invite.startTime);
+      const minDate = new Date(timeMin);
+      const maxDate = new Date(timeMax);
+      return inviteDate >= minDate && inviteDate <= maxDate;
+    });
+    
+    console.log(`[Demo Mode] Returning ${filteredInvites.length} mock invites for user: ${userId}`);
+    
+    return {
+      invites: filteredInvites,
+      dateRange: {
+        start: timeMin,
+        end: timeMax,
+      },
+      totalCount: filteredInvites.length,
+    };
+  }
+  
+  // Normal flow for real users
   const calendar = await getCalendarClient(userId);
   const userEmail = getUserEmail(userId);
   
@@ -204,6 +239,35 @@ export async function respondToInvite(
   eventId: string,
   response: 'accepted' | 'declined' | 'tentative'
 ): Promise<RespondToInviteResponse> {
+  // Check if test mode is enabled - return mock response for ALL users
+  const TEST_MODE_ENABLED = process.env.ENABLE_TEST_MODE === 'true';
+  
+  if (TEST_MODE_ENABLED || isDemoUser(userId)) {
+    const demoInvites = getDemoInvites();
+    const invite = demoInvites.find(inv => inv.eventId === eventId);
+    
+    if (!invite) {
+      throw new Error('Event not found in demo data');
+    }
+    
+    const statusMessages = {
+      accepted: 'accepted',
+      declined: 'declined',
+      tentative: 'marked as tentative',
+    };
+    
+    console.log(`[Demo Mode] Mock response to invite "${invite.summary}" - ${response} for user: ${userId}`);
+    
+    return {
+      success: true,
+      message: `You have ${statusMessages[response]} the invitation "${invite.summary}"`,
+      eventId,
+      newStatus: response,
+      eventSummary: invite.summary || undefined,
+    };
+  }
+  
+  // Normal flow for real users
   const calendar = await getCalendarClient(userId);
   const userEmail = getUserEmail(userId);
   

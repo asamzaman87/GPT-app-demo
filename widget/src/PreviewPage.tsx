@@ -82,8 +82,9 @@ function PreviewNav() {
   const location = useLocation();
   const isDark = location.pathname.includes('dark');
   
-  const navLinks = [
+  const navLinks: Array<{ path: string; label: string; highlight?: boolean }> = [
     { path: '/auth-not-connected', label: 'Auth (Not Connected)' },
+    { path: '/auth-not-connected', label: 'Demo Login Available ⭐', highlight: true },
     { path: '/auth-connected', label: 'Auth (Connected)' },
     { path: '/invites', label: 'Invites List' },
     { path: '/invites-empty', label: 'Invites (Empty)' },
@@ -120,21 +121,25 @@ function PreviewNav() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {navLinks.map(link => {
+          {navLinks.map((link, idx) => {
             const linkPath = isDark ? `${link.path}/dark` : link.path;
             const isActive = location.pathname === linkPath;
             return (
               <Link
-                key={link.path}
+                key={`${link.path}-${idx}`}
                 to={linkPath}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  isActive
-                    ? isDark 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'bg-indigo-600 text-white'
-                    : isDark
-                      ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  link.highlight
+                    ? isDark
+                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                      : 'bg-amber-500 text-white hover:bg-amber-600'
+                    : isActive
+                      ? isDark 
+                        ? 'bg-indigo-600 text-white' 
+                        : 'bg-indigo-600 text-white'
+                      : isDark
+                        ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
                 {link.label}
@@ -173,6 +178,66 @@ function PreviewRoutes() {
       navigate('/auth-not-connected', { replace: true });
     }
   }, [location.pathname, navigate]);
+
+  // Mock fetch for demo mode
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    
+    window.fetch = async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const urlStr = url.toString();
+      
+      // Mock demo config endpoint
+      if (urlStr.includes('/auth/demo-config')) {
+        return new Response(JSON.stringify({
+          enabled: true,
+          username: 'demo_user'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Mock demo login endpoint
+      if (urlStr.includes('/auth/demo-login')) {
+        const body = init?.body ? JSON.parse(init.body as string) : {};
+        
+        if (body.username === 'demo_user' && body.password === 'demo_pass_2024') {
+          // Simulate successful login
+          setTimeout(() => {
+            setAuthData({
+              authenticated: true,
+              email: 'demo@example.com'
+            });
+          }, 100);
+          
+          return new Response(JSON.stringify({
+            success: true,
+            sessionId: 'mock-session-123',
+            email: 'demo@example.com',
+            message: 'Demo login successful'
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Invalid credentials'
+          }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      
+      // Fallback to original fetch
+      return originalFetch(url, init);
+    };
+    
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
 
   const mockContext: WidgetContextType = {
     theme,

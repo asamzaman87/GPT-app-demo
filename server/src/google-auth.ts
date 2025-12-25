@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { OAuth2Tokens } from './types.js';
 import { getTokens, saveTokens, updateTokens } from './token-store.js';
+import { isDemoUser } from './demo-data.js';
 
 // OAuth2 scopes required for Calendar access
 const SCOPES = [
@@ -227,6 +228,13 @@ export async function handleOAuthCallback(
  * Check if a user is authenticated
  */
 export function isAuthenticated(userId: string): boolean {
+  // If test mode is enabled, all users are "authenticated" (demo mode)
+  const TEST_MODE_ENABLED = process.env.ENABLE_TEST_MODE === 'true';
+  
+  if (TEST_MODE_ENABLED || isDemoUser(userId)) {
+    return true;
+  }
+  
   const storedData = getTokens(userId);
   return !!storedData && !!storedData.tokens && !!storedData.tokens.access_token;
 }
@@ -235,6 +243,13 @@ export function isAuthenticated(userId: string): boolean {
  * Get the email for an authenticated user
  */
 export function getUserEmail(userId: string): string | null {
+  // If test mode is enabled, return demo email for all users
+  const TEST_MODE_ENABLED = process.env.ENABLE_TEST_MODE === 'true';
+  
+  if (TEST_MODE_ENABLED || isDemoUser(userId)) {
+    return 'demo@example.com';
+  }
+  
   const storedData = getTokens(userId);
   return storedData?.email || null;
 }

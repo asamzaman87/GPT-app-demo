@@ -62,6 +62,16 @@ const PORT = process.env.PORT || 3000;
 // Default user ID for single-user demo
 const DEFAULT_USER_ID = 'default';
 
+// Test/Demo mode configuration
+const TEST_MODE_ENABLED = process.env.ENABLE_TEST_MODE === 'true';
+const TEST_USERNAME = process.env.TEST_USERNAME || 'demo_user';
+const TEST_PASSWORD = process.env.TEST_PASSWORD || 'demo_pass_2024';
+const TEST_USER_ID = 'demo_test_user';
+const TEST_USER_EMAIL = 'demo@example.com';
+
+// In-memory store for demo sessions
+const demoSessions = new Map<string, { userId: string; email: string; createdAt: number }>();
+
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
@@ -323,6 +333,76 @@ app.post('/api/respond', async (req: Request, res: Response) => {
     console.error('Error responding to invite:', err);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// ============================================
+// Demo/Test Mode Endpoints
+// ============================================
+
+// Demo login endpoint (only enabled when TEST_MODE_ENABLED is true)
+app.post('/auth/demo-login', (req: Request, res: Response) => {
+  if (!TEST_MODE_ENABLED) {
+    return res.status(404).json({ success: false, error: 'Demo mode not enabled' });
+  }
+
+  const { username, password } = req.body;
+
+  if (username === TEST_USERNAME && password === TEST_PASSWORD) {
+    const sessionId = uuidv4();
+    demoSessions.set(sessionId, {
+      userId: TEST_USER_ID,
+      email: TEST_USER_EMAIL,
+      createdAt: Date.now(),
+    });
+
+    // Clean up old sessions (older than 1 hour)
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    for (const [id, session] of demoSessions.entries()) {
+      if (session.createdAt < oneHourAgo) {
+        demoSessions.delete(id);
+      }
+    }
+
+    res.json({
+      success: true,
+      sessionId,
+      email: TEST_USER_EMAIL,
+      message: 'Demo login successful',
+    });
+  } else {
+    res.status(401).json({ success: false, error: 'Invalid credentials' });
+  }
+});
+
+// Check demo session status
+app.get('/auth/demo-status', (req: Request, res: Response) => {
+  if (!TEST_MODE_ENABLED) {
+    return res.status(404).json({ success: false, error: 'Demo mode not enabled' });
+  }
+
+  const sessionId = req.query.sessionId as string;
+  if (!sessionId) {
+    return res.json({ authenticated: false });
+  }
+
+  const session = demoSessions.get(sessionId);
+  if (session) {
+    res.json({
+      authenticated: true,
+      email: session.email,
+      userId: session.userId,
+    });
+  } else {
+    res.json({ authenticated: false });
+  }
+});
+
+// Get demo mode configuration
+app.get('/auth/demo-config', (req: Request, res: Response) => {
+  res.json({
+    enabled: TEST_MODE_ENABLED,
+    username: TEST_MODE_ENABLED ? TEST_USERNAME : null,
+  });
 });
 
 // ============================================
