@@ -169,13 +169,13 @@ function getTools(): AppsTool[] {
     {
       name: 'batch_respond_to_invites',
       title: 'Batch Respond to Invites',
-      description: 'Respond to multiple calendar invitations at once. Useful for accepting/declining multiple invites in bulk. When asking the user for confirmation, list all the meeting titles to make it clear which events will be affected.',
+      description: 'Respond to multiple calendar invitations at once (maximum 10 invites per batch). Useful for accepting/declining multiple invites in bulk. When asking the user for confirmation, list all the meeting titles to make it clear which events will be affected. If more than 10 invites need to be processed, split into multiple batches.',
       inputSchema: {
         type: 'object',
         properties: {
           invites: {
             type: 'array',
-            description: 'Array of invites to respond to. Each item should include the event_id, event_title (for display), and response.',
+            description: 'Array of invites to respond to (maximum 10). Each item should include the event_id, event_title (for display), and response.',
             items: {
               type: 'object',
               properties: {
@@ -197,6 +197,7 @@ function getTools(): AppsTool[] {
               additionalProperties: false,
             },
             minItems: 1,
+            maxItems: 10,
           },
         },
         required: ['invites'],
@@ -375,6 +376,20 @@ async function handleBatchRespondToInvites(
       },
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
+      },
+      isError: true,
+    };
+  }
+
+  // Enforce batch size limit
+  const MAX_BATCH_SIZE = 10;
+  if (args.invites.length > MAX_BATCH_SIZE) {
+    return {
+      content: [{ type: 'text', text: `Error: Cannot process more than ${MAX_BATCH_SIZE} invites at once. You requested ${args.invites.length} invites. Please split into smaller batches.` }],
+      structuredContent: {
+        error: 'Batch size limit exceeded',
+        maxBatchSize: MAX_BATCH_SIZE,
+        requestedSize: args.invites.length,
       },
       isError: true,
     };

@@ -17,6 +17,48 @@ async function getCalendarClient(userId: string): Promise<calendar_v3.Calendar> 
 }
 
 /**
+ * Exponential backoff helper for API calls
+ * Retries on 403/429 rate limit errors with exponential delay
+ */
+async function withExponentialBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 5,
+  initialDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if it's a rate limit error
+      const isRateLimit = error.code === 403 || error.code === 429 || 
+                          error.response?.status === 403 || error.response?.status === 429;
+      
+      // If not a rate limit error or last attempt, throw immediately
+      if (!isRateLimit || attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Calculate exponential delay: 1s, 2s, 4s, 8s, 16s
+      const delay = initialDelay * Math.pow(2, attempt);
+      const jitter = Math.random() * 200; // Add 0-200ms random jitter
+      const totalDelay = delay + jitter;
+      
+      console.log(`Rate limit hit (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${Math.round(totalDelay)}ms...`);
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, totalDelay));
+    }
+  }
+  
+  // Should never reach here, but TypeScript needs it
+  throw lastError;
+}
+
+/**
  * Format a date for display
  */
 function formatDateTime(start: { dateTime?: string | null; date?: string | null }): {
@@ -111,15 +153,17 @@ export async function getPendingInvites(
   const timeMax = endDate || defaultEnd.toISOString();
   
   try {
-    // Fetch events from primary calendar
-    const response = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin,
-      timeMax,
-      singleEvents: true,
-      orderBy: 'startTime',
-      maxResults: 250, // Get a good number of events
-    });
+    // Fetch events from primary calendar with exponential backoff
+    const response = await withExponentialBackoff(() => 
+      calendar.events.list({
+        calendarId: 'primary',
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: 'startTime',
+        maxResults: 250, // Get a good number of events
+      })
+    );
     
     const events = response.data.items || [];
     
@@ -168,11 +212,13 @@ export async function respondToInvite(
   }
   
   try {
-    // First, get the event to find current attendees
-    const eventResponse = await calendar.events.get({
-      calendarId: 'primary',
-      eventId,
-    });
+    // First, get the event to find current attendees with exponential backoff
+    const eventResponse = await withExponentialBackoff(() =>
+      calendar.events.get({
+        calendarId: 'primary',
+        eventId,
+      })
+    );
     
     const event = eventResponse.data;
     
@@ -191,15 +237,17 @@ export async function respondToInvite(
       return attendee;
     });
     
-    // Update the event with new attendee status
-    await calendar.events.patch({
-      calendarId: 'primary',
-      eventId,
-      requestBody: {
-        attendees: updatedAttendees,
-      },
-      sendUpdates: 'all', // Notify organizer of the response
-    });
+    // Update the event with new attendee status with exponential backoff
+    await withExponentialBackoff(() =>
+      calendar.events.patch({
+        calendarId: 'primary',
+        eventId,
+        requestBody: {
+          attendees: updatedAttendees,
+        },
+        sendUpdates: 'all', // Notify organizer of the response
+      })
+    );
     
     // Generate a user-friendly message
     const statusMessages = {
@@ -240,10 +288,12 @@ export async function getEvent(
   const calendar = await getCalendarClient(userId);
   
   try {
-    const response = await calendar.events.get({
-      calendarId: 'primary',
-      eventId,
-    });
+    const response = await withExponentialBackoff(() =>
+      calendar.events.get({
+        calendarId: 'primary',
+        eventId,
+      })
+    );
     
     const event = response.data;
     
