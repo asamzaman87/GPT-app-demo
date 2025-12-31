@@ -11,12 +11,13 @@ import type { PendingInvite, PendingInvitesOutput } from '../types';
 interface InviteCardProps {
   invite: PendingInvite;
   onRespond: (eventId: string, eventTitle: string, response: string) => Promise<void>;
+  onCommentAdded: (eventId: string, comment: string) => void;
   isDark: boolean;
   index: number;
   total: number;
 }
 
-function InviteCard({ invite, onRespond, isDark, index, total }: InviteCardProps) {
+function InviteCard({ invite, onRespond, onCommentAdded, isDark, index, total }: InviteCardProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'accepted' | 'declined' | 'tentative' | 'error'>('idle');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
@@ -41,14 +42,16 @@ function InviteCard({ invite, onRespond, isDark, index, total }: InviteCardProps
   const handleAddComment = async () => {
     if (!comment.trim()) return;
     
+    const trimmedComment = comment.trim();
     setIsAddingComment(true);
     setWasEditing(hasExistingComment); // Track if we're editing
     try {
       await callTool('add_comment_to_invite', {
         event_id: invite.eventId,
         event_title: invite.summary || 'this meeting',
-        comment: comment.trim(),
+        comment: trimmedComment,
       });
+      onCommentAdded(invite.eventId, trimmedComment);
       setCommentAdded(true);
       setShowCommentInput(false);
       setComment('');
@@ -214,7 +217,7 @@ function InviteCard({ invite, onRespond, isDark, index, total }: InviteCardProps
                     setComment(invite.userComment || '');
                   }
                 }}
-                className={`w-full text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} hover:bg-opacity-80 transition-colors ${theme.card(isDark)}`}
+                className={`w-full text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors`}
               >
                 {hasExistingComment ? 'Edit note' : 'Add a note'}
               </button>
@@ -279,6 +282,18 @@ export function InvitesView() {
     } catch (err) {
       console.error('[Widget] Failed to respond:', err);
       throw err;
+    }
+  };
+
+  const handleCommentAdded = (eventId: string, comment: string) => {
+    // Update the invitesData to reflect the new comment
+    if (invitesData && invitesData.invites) {
+      const updatedInvites = invitesData.invites.map(invite => 
+        invite.eventId === eventId 
+          ? { ...invite, userComment: comment }
+          : invite
+      );
+      setInvitesData({ ...invitesData, invites: updatedInvites });
     }
   };
 
@@ -392,7 +407,8 @@ export function InvitesView() {
               <InviteCard 
                 key={invite.eventId} 
                 invite={invite} 
-                onRespond={handleRespond} 
+                onRespond={handleRespond}
+                onCommentAdded={handleCommentAdded}
                 isDark={isDark}
                 index={idx + 1}
                 total={invites.length}
