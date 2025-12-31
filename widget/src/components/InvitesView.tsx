@@ -162,13 +162,18 @@ function InviteCard({ invite, onRespond, isDark, index, total }: InviteCardProps
           </p>
           <div className="space-y-2 max-h-32 overflow-y-auto">
             {invite.attendees.map((attendee, idx) => (
-              <div key={idx} className="flex items-center justify-between gap-2">
+              <div key={idx} className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm truncate ${theme.textPrimary(isDark)}`}>
                     {attendee.name || attendee.email}
                   </p>
                   {attendee.name && (
                     <p className={`text-xs truncate ${theme.textPrimary(isDark)}`}>{attendee.email}</p>
+                  )}
+                  {attendee.comment && (
+                    <p className={`text-xs mt-1 italic ${theme.textPrimary(isDark)} opacity-75`}>
+                      {attendee.comment}
+                    </p>
                   )}
                 </div>
                 <div className="shrink-0">
@@ -186,7 +191,7 @@ function InviteCard({ invite, onRespond, isDark, index, total }: InviteCardProps
         {commentAdded && (
           <div className="mb-2">
             <Badge className='w-full justify-center p-2' color="success">
-              📝 Note {wasEditing ? 'updated' : 'sent'} successfully
+             Note {wasEditing ? 'updated' : 'sent'} successfully
             </Badge>
           </div>
         )}
@@ -211,7 +216,7 @@ function InviteCard({ invite, onRespond, isDark, index, total }: InviteCardProps
                 }}
                 className={`w-full text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} hover:bg-opacity-80 transition-colors ${theme.card(isDark)}`}
               >
-                📝 {hasExistingComment ? 'Edit note' : 'Add a note'}
+                {hasExistingComment ? 'Edit note' : 'Add a note'}
               </button>
             ) : (
               <div className={`mt-2 p-3 rounded-lg ${theme.card(isDark)}`}>

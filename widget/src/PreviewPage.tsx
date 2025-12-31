@@ -30,12 +30,13 @@ const mockInvites: PendingInvitesOutput = {
       location: 'Conference Room A',
       calendarLink: 'https://calendar.google.com/event?eid=abc123',
       attendees: [
-        { email: 'you@company.com', name: 'You', status: 'needsAction' },
-        { email: 'john@company.com', name: 'John Smith', status: 'accepted' },
-        { email: 'alice@company.com', name: 'Alice Johnson', status: 'accepted' },
-        { email: 'bob@company.com', name: 'Bob Williams', status: 'tentative' },
-        { email: 'carol@company.com', name: 'Carol Davis', status: 'declined' }
-      ]
+        { email: 'you@company.com', name: 'You', status: 'needsAction', comment: null },
+        { email: 'john@company.com', name: 'John Smith', status: 'accepted', comment: 'Looking forward to it!' },
+        { email: 'alice@company.com', name: 'Alice Johnson', status: 'accepted', comment: null },
+        { email: 'bob@company.com', name: 'Bob Williams', status: 'tentative', comment: 'I might be 5 minutes late' },
+        { email: 'carol@company.com', name: 'Carol Davis', status: 'declined', comment: 'Conflicting meeting, sorry!' }
+      ],
+      userComment: null
     },
     {
       eventId: '2',
@@ -49,11 +50,12 @@ const mockInvites: PendingInvitesOutput = {
       location: 'Zoom Meeting: https://zoom.us/j/123456789',
       calendarLink: 'https://calendar.google.com/event?eid=def456',
       attendees: [
-        { email: 'you@company.com', name: 'You', status: 'needsAction' },
-        { email: 'sarah@company.com', name: 'Sarah Johnson', status: 'accepted' },
-        { email: 'mike@company.com', name: 'Mike Chen', status: 'accepted' },
-        { email: 'emma@company.com', name: null, status: 'accepted' },
-      ]
+        { email: 'you@company.com', name: 'You', status: 'needsAction', comment: null },
+        { email: 'sarah@company.com', name: 'Sarah Johnson', status: 'accepted', comment: null },
+        { email: 'mike@company.com', name: 'Mike Chen', status: 'accepted', comment: 'Will have Q1 data ready' },
+        { email: 'emma@company.com', name: null, status: 'accepted', comment: null },
+      ],
+      userComment: 'I need to review the doc first'
     },
     {
       eventId: '3',
@@ -67,9 +69,10 @@ const mockInvites: PendingInvitesOutput = {
       location: null,
       calendarLink: 'https://calendar.google.com/event?eid=ghi789',
       attendees: [
-        { email: 'you@company.com', name: 'You', status: 'needsAction' },
-        { email: 'client@external.com', name: 'External Client', status: 'accepted' },
-      ]
+        { email: 'you@company.com', name: 'You', status: 'needsAction', comment: null },
+        { email: 'client@external.com', name: 'External Client', status: 'accepted', comment: null },
+      ],
+      userComment: null
     }
   ]
 };
