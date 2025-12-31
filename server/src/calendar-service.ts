@@ -125,6 +125,7 @@ function eventToPendingInvite(event: calendar_v3.Schema$Event, userEmail: string
       name: a.displayName || null,
       status: a.responseStatus || 'unknown',
       comment: a.comment || null,
+      self: a.email?.toLowerCase() === userEmail.toLowerCase(),
     })),
     calendarLink: event.htmlLink || '',
     userComment: userAttendee.comment || null, // Include the user's own comment

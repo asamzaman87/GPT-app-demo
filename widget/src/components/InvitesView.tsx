@@ -288,11 +288,20 @@ export function InvitesView() {
   const handleCommentAdded = (eventId: string, comment: string) => {
     // Update the invitesData to reflect the new comment
     if (invitesData && invitesData.invites) {
-      const updatedInvites = invitesData.invites.map(invite => 
-        invite.eventId === eventId 
-          ? { ...invite, userComment: comment }
-          : invite
-      );
+      const updatedInvites = invitesData.invites.map(invite => {
+        if (invite.eventId === eventId) {
+          // Also update the current user's attendee comment in the attendees list
+          const updatedAttendees = invite.attendees?.map(attendee => 
+            attendee.self ? { ...attendee, comment } : attendee
+          );
+          return { 
+            ...invite, 
+            userComment: comment,
+            attendees: updatedAttendees || invite.attendees
+          };
+        }
+        return invite;
+      });
       setInvitesData({ ...invitesData, invites: updatedInvites });
     }
   };

@@ -27,6 +27,7 @@ export interface Attendee {
   name: string | null;
   status: string;
   comment?: string | null;
+  self?: boolean | null;
 }
 
 export interface PendingInvitesData {
