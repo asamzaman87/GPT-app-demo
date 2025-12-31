@@ -65,8 +65,10 @@ export interface PendingInvite {
     email: string;
     name: string | null;
     status: string;
+    comment?: string | null;
   }[];
   calendarLink: string;
+  userComment?: string | null; // The current user's comment on this invite
 }
 
 export interface PendingInvitesResponse {
@@ -81,6 +83,11 @@ export interface PendingInvitesResponse {
 export interface RespondToInviteRequest {
   eventId: string;
   response: 'accepted' | 'declined' | 'tentative';
+}
+
+export interface AddCommentToInviteRequest {
+  eventId: string;
+  comment: string;
 }
 
 export interface RespondToInviteResponse {

@@ -124,8 +124,10 @@ function eventToPendingInvite(event: calendar_v3.Schema$Event, userEmail: string
       email: a.email || 'Unknown',
       name: a.displayName || null,
       status: a.responseStatus || 'unknown',
+      comment: a.comment || null,
     })),
     calendarLink: event.htmlLink || '',
+    userComment: userAttendee.comment || null, // Include the user's own comment
   };
 }
 
@@ -275,6 +277,85 @@ export async function respondToInvite(
     }
     
     throw new Error(`Failed to respond to invite: ${error.message}`);
+  }
+}
+
+/**
+ * Add a comment to a calendar invite
+ */
+export async function addCommentToInvite(
+  userId: string,
+  eventId: string,
+  comment: string
+): Promise<RespondToInviteResponse> {
+  const calendar = await getCalendarClient(userId);
+  const userEmail = getUserEmail(userId);
+  
+  if (!userEmail) {
+    throw new Error('User email not found');
+  }
+  
+  if (!comment || comment.trim() === '') {
+    throw new Error('Comment cannot be empty');
+  }
+  
+  try {
+    // First, get the event to find current attendees with exponential backoff
+    const eventResponse = await withExponentialBackoff(() =>
+      calendar.events.get({
+        calendarId: 'primary',
+        eventId,
+      })
+    );
+    
+    const event = eventResponse.data;
+    
+    if (!event.attendees) {
+      throw new Error('Event has no attendees');
+    }
+    
+    // Find and update the user's attendee comment (replaces existing comment)
+    const updatedAttendees = event.attendees.map((attendee) => {
+      if (attendee.email?.toLowerCase() === userEmail.toLowerCase()) {
+        return {
+          ...attendee,
+          comment: comment.trim(),
+        };
+      }
+      return attendee;
+    });
+    
+    // Update the event with the comment with exponential backoff
+    await withExponentialBackoff(() =>
+      calendar.events.patch({
+        calendarId: 'primary',
+        eventId,
+        requestBody: {
+          attendees: updatedAttendees,
+        },
+        sendUpdates: 'all', // Notify organizer of the comment
+      })
+    );
+    
+    return {
+      success: true,
+      message: `Comment added to "${event.summary}": "${comment}"`,
+      eventId,
+      newStatus: 'comment_added',
+      eventSummary: event.summary || undefined,
+    };
+  } catch (error: any) {
+    console.error('Error adding comment to invite:', error);
+    
+    if (error.code === 401) {
+      throw new Error('Authentication expired. Please re-authenticate.');
+    }
+    
+    if (error.code === 404) {
+      throw new Error('Event not found. It may have been cancelled or deleted.');
+    }
+    
+    throw new Error(`Failed to add comment: ${error.message}`);
   }
 }
 

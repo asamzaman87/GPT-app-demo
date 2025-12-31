@@ -115,6 +115,19 @@ export async function respondToInvite(
 }
 
 /**
+ * Add a comment to a calendar invite
+ */
+export async function addCommentToInvite(
+  eventId: string,
+  comment: string
+): Promise<ApiResponse<RespondToInviteData>> {
+  return apiRequest<RespondToInviteData>('/api/add-comment', {
+    method: 'POST',
+    body: JSON.stringify({ eventId, comment }),
+  });
+}
+
+/**
  * Parse URL parameters (for handling OAuth callback)
  */
 export function parseUrlParams(): {

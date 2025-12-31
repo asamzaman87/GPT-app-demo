@@ -13,8 +13,10 @@ export interface PendingInvite {
     email: string;
     name: string | null;
     status: string;
+    comment?: string | null;
   }[];
   calendarLink: string;
+  userComment?: string | null;
 }
 
 // Tool output types

@@ -35,6 +35,7 @@ import {
 import {
   getPendingInvites,
   respondToInvite,
+  addCommentToInvite,
 } from './calendar-service.js';
 import { handleMCPRequest } from './mcp-server.js';
 import { deleteTokens } from './token-store.js';
@@ -321,6 +322,42 @@ app.post('/api/respond', async (req: Request, res: Response) => {
     res.json({ success: true, data: result });
   } catch (err: any) {
     console.error('Error responding to invite:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Add comment to an invite
+app.post('/api/add-comment', async (req: Request, res: Response) => {
+  const userId = DEFAULT_USER_ID;
+  const { eventId, comment } = req.body;
+
+  if (!isAuthenticated(userId)) {
+    return res.status(401).json({
+      success: false,
+      error: 'Not authenticated',
+      authUrl: getAuthUrl(userId),
+    });
+  }
+
+  if (!eventId || !comment) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: eventId, comment',
+    });
+  }
+
+  if (typeof comment !== 'string' || comment.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      error: 'Comment must be a non-empty string',
+    });
+  }
+
+  try {
+    const result = await addCommentToInvite(userId, eventId, comment);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    console.error('Error adding comment to invite:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

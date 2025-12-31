@@ -11,6 +11,7 @@ import {
 import {
   getPendingInvites,
   respondToInvite,
+  addCommentToInvite,
 } from './calendar-service.js';
 import { isAuthenticated, getAuthUrl, getUserEmail } from './google-auth.js';
 import fs from 'fs';
@@ -229,6 +230,44 @@ function getTools(): AppsTool[] {
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: true,
+        openWorldHint: true,
+      },
+      securitySchemes: [
+        { type: 'oauth2', scopes: ['calendar:write'] },
+      ],
+      _meta: {
+        'openai/visibility': 'public',
+        'openai/widgetAccessible': false,
+      },
+    },
+    {
+      name: 'add_comment_to_invite',
+      title: 'Add Note to Invite',
+      description: 'Add a note to a calendar invitation that will be visible to the organizer. This matches Google Calendar\'s "add a note" feature and allows you to provide context or explanation about your attendance (e.g., "I can join but might be 5 minutes late" or "Looking forward to this meeting"). The note will be sent to the organizer. Users will typically say "add a note" rather than "add a comment".',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          event_id: {
+            type: 'string',
+            description: 'The unique event ID from the invites list. This is used to identify which event to add a note to.',
+          },
+          event_title: {
+            type: 'string',
+            description: 'The title/summary of the event from the invites list. Use this when asking the user for confirmation (e.g., "Team Standup Meeting"). This helps make the confirmation message more readable. If not provided, defaults to "this meeting".',
+          },
+          comment: {
+            type: 'string',
+            description: 'The note to add to the invitation. This will be visible to the event organizer. Examples: "I can attend but might be 5 minutes late", "Looking forward to discussing the project", or "I may need to leave early".',
+          },
+        },
+        required: ['event_id', 'comment'],
+        additionalProperties: false,
+      },
+      annotations: {
+        title: 'Add Note to Invite',
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
         openWorldHint: true,
       },
       securitySchemes: [
@@ -490,6 +529,63 @@ async function handleBatchRespondToInvites(
 }
 
 /**
+ * Handle add_comment_to_invite tool (adds a note to invite)
+ */
+async function handleAddCommentToInvite(
+  args: { event_id: string; event_title?: string; comment: string },
+  userId: string
+): Promise<AppsToolResponse> {
+  if (!args.event_id) {
+    return {
+      content: [{ type: 'text', text: 'Error: event_id is required' }],
+      structuredContent: { error: 'event_id is required', success: false },
+      isError: true,
+    };
+  }
+  
+  if (!args.comment || args.comment.trim() === '') {
+    return {
+      content: [{ type: 'text', text: 'Error: note cannot be empty' }],
+      structuredContent: { error: 'note cannot be empty', success: false },
+      isError: true,
+    };
+  }
+
+  if (!isAuthenticated(userId)) {
+    const authUrl = getAuthUrl(userId);
+    return {
+      content: [{ type: 'text', text: 'User needs to authenticate first.' }],
+      structuredContent: { authRequired: true, authUrl, success: false },
+      isError: true,
+    };
+  }
+
+  try {
+    const result = await addCommentToInvite(userId, args.event_id, args.comment);
+    
+    const eventTitle = args.event_title || result.eventSummary || 'this meeting';
+    
+    return {
+      content: [{ type: 'text', text: `Successfully added note to "${eventTitle}": "${args.comment}"` }],
+      structuredContent: {
+        success: true,
+        eventId: args.event_id,
+        comment: args.comment,
+        message: result.message,
+        eventSummary: result.eventSummary,
+      },
+      isError: false,
+    };
+  } catch (error: any) {
+    return {
+      content: [{ type: 'text', text: `Error: ${error.message}` }],
+      structuredContent: { error: error.message, success: false },
+      isError: true,
+    };
+  }
+}
+
+/**
  * Handle check_auth_status tool
  */
 function handleCheckAuthStatus(userId: string): AppsToolResponse {
@@ -592,6 +688,12 @@ export function createMCPServer(): Server {
       case 'batch_respond_to_invites':
         return await handleBatchRespondToInvites(
           args as { invites: Array<{ event_id: string; event_title?: string; response: 'accepted' | 'declined' | 'tentative' }> },
+          userId
+        ) as unknown as CallToolResult;
+
+      case 'add_comment_to_invite':
+        return await handleAddCommentToInvite(
+          args as { event_id: string; event_title?: string; comment: string },
           userId
         ) as unknown as CallToolResult;
 
@@ -759,6 +861,12 @@ export async function handleMCPRequest(
         case 'batch_respond_to_invites':
           return await handleBatchRespondToInvites(
             args as { invites: Array<{ event_id: string; event_title?: string; response: 'accepted' | 'declined' | 'tentative' }> },
+            toolUserId
+          );
+
+        case 'add_comment_to_invite':
+          return await handleAddCommentToInvite(
+            args as { event_id: string; event_title?: string; comment: string },
             toolUserId
           );
 

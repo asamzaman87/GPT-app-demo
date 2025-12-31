@@ -19,12 +19,14 @@ export interface PendingInvite {
   organizerName: string | null;
   attendees: Attendee[];
   calendarLink: string;
+  userComment?: string | null;
 }
 
 export interface Attendee {
   email: string;
   name: string | null;
   status: string;
+  comment?: string | null;
 }
 
 export interface PendingInvitesData {
