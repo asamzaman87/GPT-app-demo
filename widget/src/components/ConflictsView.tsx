@@ -420,7 +420,7 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                             const userAttendee = event.attendees?.find(a => a.self);
                             const isOrganizer = userAttendee?.organizer === true;
                             
-                            return isOrganizer && state.status === 'idle' && (
+                            return isOrganizer && (
                               <>
                                 {!state.showRescheduleInput ? (
                                   <button 
