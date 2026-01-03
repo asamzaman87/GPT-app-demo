@@ -15,6 +15,7 @@ export interface PendingInvite {
     status: string;
     comment?: string | null;
     self?: boolean | null;
+    organizer?: boolean | null;
   }[];
   calendarLink: string;
   userComment?: string | null;

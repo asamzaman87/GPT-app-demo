@@ -91,6 +91,12 @@ export interface AddCommentToInviteRequest {
   comment: string;
 }
 
+export interface RescheduleEventRequest {
+  eventId: string;
+  newStartTime: string;
+  newEndTime: string;
+}
+
 export interface RespondToInviteResponse {
   success: boolean;
   message: string;

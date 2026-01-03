@@ -361,6 +361,93 @@ export async function addCommentToInvite(
 }
 
 /**
+ * Reschedule a calendar event (only if user is the organizer)
+ */
+export async function rescheduleEvent(
+  userId: string,
+  eventId: string,
+  newStartTime: string,
+  newEndTime: string
+): Promise<RespondToInviteResponse> {
+  const calendar = await getCalendarClient(userId);
+  const userEmail = getUserEmail(userId);
+  
+  if (!userEmail) {
+    throw new Error('User email not found');
+  }
+  
+  // Validate the new times
+  const startDate = new Date(newStartTime);
+  const endDate = new Date(newEndTime);
+  
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    throw new Error('Invalid date/time format');
+  }
+  
+  if (endDate <= startDate) {
+    throw new Error('End time must be after start time');
+  }
+  
+  try {
+    // First, get the event to check if user is the organizer
+    const eventResponse = await withExponentialBackoff(() =>
+      calendar.events.get({
+        calendarId: 'primary',
+        eventId,
+      })
+    );
+    
+    const event = eventResponse.data;
+    
+    // Check if user is the organizer
+    const isOrganizer = event.organizer?.email?.toLowerCase() === userEmail.toLowerCase();
+    
+    if (!isOrganizer) {
+      throw new Error('Only the organizer can reschedule this event');
+    }
+    
+    // Update the event times
+    await withExponentialBackoff(() =>
+      calendar.events.patch({
+        calendarId: 'primary',
+        eventId,
+        requestBody: {
+          start: {
+            dateTime: newStartTime,
+            timeZone: event.start?.timeZone || 'UTC',
+          },
+          end: {
+            dateTime: newEndTime,
+            timeZone: event.end?.timeZone || 'UTC',
+          },
+        },
+        sendUpdates: 'all', // Notify all attendees of the change
+      })
+    );
+    
+    return {
+      success: true,
+      message: `Event "${event.summary}" rescheduled to ${startDate.toLocaleString()}`,
+      eventId,
+      newStatus: 'rescheduled',
+      eventSummary: event.summary || undefined,
+    };
+  } catch (error: any) {
+    console.error('Error rescheduling event:', error);
+    
+    if (error.code === 401) {
+      throw new Error('Authentication expired. Please re-authenticate.');
+    }
+    
+    if (error.code === 404) {
+      throw new Error('Event not found. It may have been cancelled or deleted.');
+    }
+    
+    throw new Error(`Failed to reschedule event: ${error.message}`);
+  }
+}
+
+/**
  * Get a single event by ID
  */
 export async function getEvent(

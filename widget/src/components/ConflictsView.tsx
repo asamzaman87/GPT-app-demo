@@ -17,19 +17,25 @@ interface ConflictGroup {
 }
 
 interface EventState {
-  status: 'idle' | 'loading' | 'accepted' | 'declined' | 'tentative' | 'error';
+  status: 'idle' | 'loading' | 'accepted' | 'declined' | 'tentative' | 'error' | 'rescheduled';
   showCommentInput: boolean;
   comment: string;
   isAddingComment: boolean;
   commentAdded: boolean;
   wasEditing: boolean;
+  showRescheduleInput: boolean;
+  newStartTime: string;
+  newEndTime: string;
+  isRescheduling: boolean;
+  rescheduled: boolean;
 }
 
-function ConflictCard({ group, isDark, onRespond, onCommentAdded }: { 
+function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled }: { 
   group: ConflictGroup; 
   isDark: boolean;
   onRespond: (eventId: string, eventTitle: string, response: string) => Promise<void>;
   onCommentAdded: (eventId: string, comment: string) => void;
+  onRescheduled: () => Promise<void>;
 }) {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [eventStates, setEventStates] = useState<Record<string, EventState>>({});
@@ -43,6 +49,11 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded }: {
       isAddingComment: false,
       commentAdded: false,
       wasEditing: false,
+      showRescheduleInput: false,
+      newStartTime: '',
+      newEndTime: '',
+      isRescheduling: false,
+      rescheduled: false,
     };
   };
 
@@ -91,6 +102,38 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded }: {
     } catch (error) {
       console.error('Failed to add note:', error);
       updateEventState(event.eventId, { status: 'error', isAddingComment: false });
+    }
+  };
+
+  const handleReschedule = async (event: PendingInvite) => {
+    const state = getEventState(event.eventId);
+    if (!state.newStartTime || !state.newEndTime) return;
+    
+    updateEventState(event.eventId, { isRescheduling: true });
+    try {
+      await callTool('reschedule_event', {
+        event_id: event.eventId,
+        event_title: event.summary || 'this event',
+        new_start_time: state.newStartTime,
+        new_end_time: state.newEndTime,
+      });
+      updateEventState(event.eventId, { 
+        rescheduled: true,
+        showRescheduleInput: false,
+        isRescheduling: false,
+        status: 'idle' // Reset to idle so reschedule button shows again
+      });
+      
+      // Refresh the conflicting events list to see if conflicts still exist
+      await onRescheduled();
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        updateEventState(event.eventId, { rescheduled: false });
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to reschedule event:', error);
+      updateEventState(event.eventId, { status: 'error', isRescheduling: false });
     }
   };
   
@@ -372,6 +415,123 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded }: {
                             </>
                           )}
 
+                          {/* Reschedule Section - Only for organizers */}
+                          {(() => {
+                            const userAttendee = event.attendees?.find(a => a.self);
+                            const isOrganizer = userAttendee?.organizer === true;
+                            
+                            return isOrganizer && state.status === 'idle' && (
+                              <>
+                                {!state.showRescheduleInput ? (
+                                  <button 
+                                    onClick={() => {
+                                      // Pre-fill with current event times in datetime-local format
+                                      const startDateTime = new Date(event.startTime);
+                                      const endDateTime = new Date(event.endTime);
+                                      
+                                      // Format as YYYY-MM-DDTHH:mm for datetime-local input
+                                      const formatForInput = (date: Date) => {
+                                        const year = date.getFullYear();
+                                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                                        const day = String(date.getDate()).padStart(2, '0');
+                                        const hours = String(date.getHours()).padStart(2, '0');
+                                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                                        return `${year}-${month}-${day}T${hours}:${minutes}`;
+                                      };
+                                      
+                                      updateEventState(event.eventId, { 
+                                        showRescheduleInput: true,
+                                        newStartTime: formatForInput(startDateTime),
+                                        newEndTime: formatForInput(endDateTime)
+                                      });
+                                    }}
+                                    className={`w-full text-sm py-2 px-3 rounded-lg mt-2 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors`}
+                                  >
+                                    Reschedule Event
+                                  </button>
+                                ) : (
+                                  <div className={`mt-2 p-3 rounded-lg border ${theme.card(isDark)}`}>
+                                    <p className={`text-xs font-semibold mb-2 ${theme.textPrimary(isDark)}`}>Reschedule Event</p>
+                                    <div className="space-y-2">
+                                      <div>
+                                        <label className={`text-xs ${theme.textPrimary(isDark)} opacity-75`}>Start Time</label>
+                                        <input
+                                          type="datetime-local"
+                                          value={state.newStartTime}
+                                          onChange={(e) => updateEventState(event.eventId, { newStartTime: e.target.value })}
+                                          onClick={(e) => {
+                                            try {
+                                              (e.target as HTMLInputElement).showPicker?.();
+                                            } catch (err) {
+                                              // Fallback for browsers that don't support showPicker()
+                                              console.log('showPicker not supported');
+                                            }
+                                          }}
+                                          className={`w-full p-2 text-sm rounded-lg border ${theme.textPrimary(isDark)} ${theme.card(isDark)} ${theme.buttonBorder(isDark)} cursor-pointer ${isDark ? 'datetime-dark-mode' : ''}`}
+                                          style={isDark ? { colorScheme: 'dark' } : undefined}
+                                          disabled={state.isRescheduling}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className={`text-xs ${theme.textPrimary(isDark)} opacity-75`}>End Time</label>
+                                        <input
+                                          type="datetime-local"
+                                          value={state.newEndTime}
+                                          onChange={(e) => updateEventState(event.eventId, { newEndTime: e.target.value })}
+                                          onClick={(e) => {
+                                            try {
+                                              (e.target as HTMLInputElement).showPicker?.();
+                                            } catch (err) {
+                                              // Fallback for browsers that don't support showPicker()
+                                              console.log('showPicker not supported');
+                                            }
+                                          }}
+                                          className={`w-full p-2 text-sm rounded-lg border ${theme.textPrimary(isDark)} ${theme.card(isDark)} ${theme.buttonBorder(isDark)} cursor-pointer ${isDark ? 'datetime-dark-mode' : ''}`}
+                                          style={isDark ? { colorScheme: 'dark' } : undefined}
+                                          disabled={state.isRescheduling}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 mt-3">
+                                      <button 
+                                        className={`flex-1 rounded-lg py-1.5 text-sm ${theme.buttonShadow()} ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)}`}
+                                        onClick={() => {
+                                          // Convert datetime-local to ISO format
+                                          const startISO = new Date(state.newStartTime).toISOString();
+                                          const endISO = new Date(state.newEndTime).toISOString();
+                                          updateEventState(event.eventId, { 
+                                            newStartTime: startISO, 
+                                            newEndTime: endISO 
+                                          });
+                                          handleReschedule(event);
+                                        }}
+                                        disabled={!state.newStartTime || !state.newEndTime || state.isRescheduling}
+                                      >
+                                        {state.isRescheduling ? 'Rescheduling...' : 'Reschedule'}
+                                      </button>
+                                      <button 
+                                        className={`rounded-lg py-1.5 px-3 text-sm ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
+                                        onClick={() => updateEventState(event.eventId, { showRescheduleInput: false })}
+                                        disabled={state.isRescheduling}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+
+                          {/* Show rescheduled success message */}
+                          {state.rescheduled && (
+                            <div className="mt-2">
+                              <Badge className='w-full justify-center p-2' color="success">
+                                Event rescheduled successfully
+                              </Badge>
+                            </div>
+                          )}
+
                           {state.status === 'loading' && <div className={`text-center py-2 text-sm ${theme.textPrimary(isDark)}`}>Sending...</div>}
                           {(state.status === 'accepted' || state.status === 'declined' || state.status === 'tentative') && (
                             <div className="text-center"><Badge className='p-3' color={state.status === 'accepted' ? 'success' : state.status === 'declined' ? 'danger' : 'warning'}>{state.status === 'accepted' ? '✓ Accepted' : state.status === 'declined' ? '✗ Declined' : '? Maybe'}</Badge></div>
@@ -454,6 +614,12 @@ export function ConflictsView() {
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const handleRescheduled = async () => {
+    // Refetch conflicting events after rescheduling
+    // This ensures we only show events that still have conflicts
+    await handleRefresh();
   };
 
   const handleBack = () => {
@@ -601,6 +767,7 @@ export function ConflictsView() {
                 isDark={isDark} 
                 onRespond={handleRespond}
                 onCommentAdded={handleCommentAdded}
+                onRescheduled={handleRescheduled}
               />
             ))}
           </div>

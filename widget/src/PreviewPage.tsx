@@ -95,9 +95,9 @@ const mockConflictingEvents: PendingInvitesOutput = {
       location: 'Conference Room B',
       calendarLink: 'https://calendar.google.com/event?eid=conf1',
       attendees: [
-        { email: 'you@company.com', name: 'You', status: 'accepted', comment: null, self: true },
-        { email: 'sarah@company.com', name: 'Sarah Chen', status: 'accepted', comment: null, self: false },
-        { email: 'mike@company.com', name: 'Mike Wilson', status: 'accepted', comment: null, self: false },
+        { email: 'you@company.com', name: 'You', status: 'accepted', comment: null, self: true, organizer: false },
+        { email: 'sarah@company.com', name: 'Sarah Chen', status: 'accepted', comment: null, self: false, organizer: true },
+        { email: 'mike@company.com', name: 'Mike Wilson', status: 'accepted', comment: null, self: false, organizer: false },
       ],
       userComment: null
     },
@@ -113,9 +113,9 @@ const mockConflictingEvents: PendingInvitesOutput = {
       location: 'Zoom: https://zoom.us/j/123456',
       calendarLink: 'https://calendar.google.com/event?eid=conf2',
       attendees: [
-        { email: 'you@company.com', name: 'You', status: 'accepted', comment: 'I have a conflict with marketing meeting', self: true },
-        { email: 'alex@company.com', name: 'Alex Rodriguez', status: 'accepted', comment: null, self: false },
-        { email: 'jamie@company.com', name: 'Jamie Lee', status: 'tentative', comment: 'Might join late', self: false },
+        { email: 'you@company.com', name: 'You', status: 'accepted', comment: 'I have a conflict with marketing meeting', self: true, organizer: true },
+        { email: 'alex@company.com', name: 'Alex Rodriguez', status: 'accepted', comment: null, self: false, organizer: false },
+        { email: 'jamie@company.com', name: 'Jamie Lee', status: 'tentative', comment: 'Might join late', self: false, organizer: false },
       ],
       userComment: 'I have a conflict with marketing meeting'
     },
@@ -131,9 +131,9 @@ const mockConflictingEvents: PendingInvitesOutput = {
       location: 'Meet: https://meet.google.com/abc-defg-hij',
       calendarLink: 'https://calendar.google.com/event?eid=conf3',
       attendees: [
-        { email: 'you@company.com', name: 'You', status: 'needsAction', comment: null, self: true },
-        { email: 'linda@company.com', name: 'Linda Johnson', status: 'accepted', comment: null, self: false },
-        { email: 'client@techcorp.com', name: 'John Smith', status: 'accepted', comment: null, self: false },
+        { email: 'you@company.com', name: 'You', status: 'needsAction', comment: null, self: true, organizer: false },
+        { email: 'linda@company.com', name: 'Linda Johnson', status: 'accepted', comment: null, self: false, organizer: true },
+        { email: 'client@techcorp.com', name: 'John Smith', status: 'accepted', comment: null, self: false, organizer: false },
       ],
       userComment: null
     }

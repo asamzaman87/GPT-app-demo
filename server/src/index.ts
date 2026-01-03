@@ -36,6 +36,7 @@ import {
   getPendingInvites,
   respondToInvite,
   addCommentToInvite,
+  rescheduleEvent,
   getConflictingEvents,
 } from './calendar-service.js';
 import { handleMCPRequest } from './mcp-server.js';
@@ -385,6 +386,35 @@ app.post('/api/add-comment', async (req: Request, res: Response) => {
     res.json({ success: true, data: result });
   } catch (err: any) {
     console.error('Error adding comment to invite:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Reschedule event endpoint
+app.post('/api/reschedule-event', async (req: Request, res: Response) => {
+  const userId = DEFAULT_USER_ID;
+  const { eventId, newStartTime, newEndTime } = req.body;
+
+  if (!isAuthenticated(userId)) {
+    return res.status(401).json({
+      success: false,
+      error: 'Not authenticated',
+      authUrl: getAuthUrl(userId),
+    });
+  }
+
+  if (!eventId || !newStartTime || !newEndTime) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: eventId, newStartTime, newEndTime',
+    });
+  }
+
+  try {
+    const result = await rescheduleEvent(userId, eventId, newStartTime, newEndTime);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    console.error('Error rescheduling event:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

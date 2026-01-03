@@ -128,6 +128,20 @@ export async function addCommentToInvite(
 }
 
 /**
+ * Reschedule an event (organizer only)
+ */
+export async function rescheduleEvent(
+  eventId: string,
+  newStartTime: string,
+  newEndTime: string
+): Promise<ApiResponse<RespondToInviteData>> {
+  return apiRequest<RespondToInviteData>('/api/reschedule-event', {
+    method: 'POST',
+    body: JSON.stringify({ eventId, newStartTime, newEndTime }),
+  });
+}
+
+/**
  * Parse URL parameters (for handling OAuth callback)
  */
 export function parseUrlParams(): {

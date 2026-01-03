@@ -12,6 +12,7 @@ import {
   getPendingInvites,
   respondToInvite,
   addCommentToInvite,
+  rescheduleEvent,
   getConflictingEvents,
 } from './calendar-service.js';
 import { isAuthenticated, getAuthUrl, getUserEmail } from './google-auth.js';
@@ -301,6 +302,48 @@ function getTools(): AppsTool[] {
       },
       annotations: {
         title: 'Add Note to Invite',
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      securitySchemes: [
+        { type: 'oauth2', scopes: ['calendar:write'] },
+      ],
+      _meta: {
+        'openai/visibility': 'public',
+        'openai/widgetAccessible': false,
+      },
+    },
+    {
+      name: 'reschedule_event',
+      title: 'Reschedule Event',
+      description: 'Reschedule a calendar event to a new date and time. This tool can only be used by the event organizer. All attendees will be notified of the change. The user should provide the event details and new time, and you should format them into ISO 8601 format.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          event_id: {
+            type: 'string',
+            description: 'The unique event ID from the calendar.',
+          },
+          event_title: {
+            type: 'string',
+            description: 'The title/summary of the event. Use this when confirming with the user. If not provided, defaults to "the event".',
+          },
+          new_start_time: {
+            type: 'string',
+            description: 'The new start time in ISO 8601 format (e.g., "2024-01-15T14:00:00Z" or "2024-01-15T14:00:00-08:00"). Convert user\'s natural language time to this format.',
+          },
+          new_end_time: {
+            type: 'string',
+            description: 'The new end time in ISO 8601 format (e.g., "2024-01-15T15:00:00Z" or "2024-01-15T15:00:00-08:00"). Convert user\'s natural language time to this format.',
+          },
+        },
+        required: ['event_id', 'new_start_time', 'new_end_time'],
+        additionalProperties: false,
+      },
+      annotations: {
+        title: 'Reschedule Event',
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,
@@ -674,6 +717,69 @@ async function handleAddCommentToInvite(
 }
 
 /**
+ * Handle reschedule_event tool
+ */
+async function handleRescheduleEvent(
+  args: { event_id: string; event_title?: string; new_start_time: string; new_end_time: string },
+  userId: string
+): Promise<AppsToolResponse> {
+  if (!args.event_id) {
+    return {
+      content: [{ type: 'text', text: 'Error: event_id is required' }],
+      structuredContent: { error: 'event_id is required', success: false },
+      isError: true,
+    };
+  }
+  
+  if (!args.new_start_time || !args.new_end_time) {
+    return {
+      content: [{ type: 'text', text: 'Error: new_start_time and new_end_time are required' }],
+      structuredContent: { error: 'new_start_time and new_end_time are required', success: false },
+      isError: true,
+    };
+  }
+
+  if (!isAuthenticated(userId)) {
+    const authUrl = getAuthUrl(userId);
+    return {
+      content: [{ type: 'text', text: 'User needs to authenticate first.' }],
+      structuredContent: { authRequired: true, authUrl, success: false },
+      isError: true,
+    };
+  }
+
+  try {
+    const result = await rescheduleEvent(userId, args.event_id, args.new_start_time, args.new_end_time);
+    
+    const eventTitle = args.event_title || result.eventSummary || 'the event';
+    const startDate = new Date(args.new_start_time);
+    const endDate = new Date(args.new_end_time);
+    
+    return {
+      content: [{ 
+        type: 'text', 
+        text: `Successfully rescheduled "${eventTitle}" to ${startDate.toLocaleString()} - ${endDate.toLocaleTimeString()}` 
+      }],
+      structuredContent: {
+        success: true,
+        eventId: args.event_id,
+        newStartTime: args.new_start_time,
+        newEndTime: args.new_end_time,
+        message: result.message,
+        eventSummary: result.eventSummary,
+      },
+      isError: false,
+    };
+  } catch (error: any) {
+    return {
+      content: [{ type: 'text', text: `Error: ${error.message}` }],
+      structuredContent: { error: error.message, success: false },
+      isError: true,
+    };
+  }
+}
+
+/**
  * Handle check_auth_status tool
  */
 function handleCheckAuthStatus(userId: string): AppsToolResponse {
@@ -788,6 +894,12 @@ export function createMCPServer(): Server {
       case 'add_comment_to_invite':
         return await handleAddCommentToInvite(
           args as { event_id: string; event_title?: string; comment: string },
+          userId
+        ) as unknown as CallToolResult;
+
+      case 'reschedule_event':
+        return await handleRescheduleEvent(
+          args as { event_id: string; event_title?: string; new_start_time: string; new_end_time: string },
           userId
         ) as unknown as CallToolResult;
 
@@ -967,6 +1079,12 @@ export async function handleMCPRequest(
         case 'add_comment_to_invite':
           return await handleAddCommentToInvite(
             args as { event_id: string; event_title?: string; comment: string },
+            toolUserId
+          );
+
+        case 'reschedule_event':
+          return await handleRescheduleEvent(
+            args as { event_id: string; event_title?: string; new_start_time: string; new_end_time: string },
             toolUserId
           );
 
