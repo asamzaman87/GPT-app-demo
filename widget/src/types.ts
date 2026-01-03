@@ -37,4 +37,5 @@ export interface AuthStatusOutput {
   authenticated: boolean;
   email?: string | null;
   authUrl?: string;
+  requestedView?: 'invites' | 'conflicts';
 }

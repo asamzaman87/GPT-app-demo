@@ -18,6 +18,9 @@ export function AuthView({ initialAuthData }: AuthViewProps) {
 
   const currentAuth = authData || initialAuthData;
   const isAuthenticated = currentAuth?.authenticated ?? false;
+  
+  // Check which view was originally requested (from authRequired response)
+  const requestedView = (currentAuth as any)?.requestedView as string | undefined;
 
   useEffect(() => { notifyHeight(); }, [isAuthenticated, isPolling, notifyHeight]);
 
@@ -115,22 +118,26 @@ export function AuthView({ initialAuthData }: AuthViewProps) {
             </>
           ) : (
             <div className="space-y-3">
-              <button 
-                className={`w-full bg-white h-12 flex items-center justify-center gap-3 font-medium rounded-xl text-black ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}
-                onClick={handleViewInvites}
-                disabled={isLoadingInvites}
-              >
-                <Calendar />
-                View Pending Invites
-              </button>
-              <button 
-                className={`w-full h-12 flex items-center justify-center gap-3 font-medium rounded-xl ${theme.textPrimary(isDark)} ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}
-                onClick={handleViewConflicts}
-                disabled={isLoadingInvites}
-              >
-                <span className="text-xl">⚠️</span>
-                Show Conflicting Events
-              </button>
+              {(requestedView === undefined || requestedView === 'invites') && (
+                <button 
+                  className={`w-full bg-white h-12 flex items-center justify-center gap-3 font-medium rounded-xl text-black ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}
+                  onClick={handleViewInvites}
+                  disabled={isLoadingInvites}
+                >
+                  <Calendar />
+                  View Pending Invites
+                </button>
+              )}
+              {(requestedView === undefined || requestedView === 'conflicts') && (
+                <button 
+                  className={`w-full h-12 flex items-center justify-center gap-3 font-medium rounded-xl ${theme.textPrimary(isDark)} ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}
+                  onClick={handleViewConflicts}
+                  disabled={isLoadingInvites}
+                >
+                  <span className="text-xl">⚠️</span>
+                  Show Conflicting Events
+                </button>
+              )}
             </div>
           )}
       </div>

@@ -411,6 +411,7 @@ async function handleGetPendingReservations(
       structuredContent: {
         authRequired: true,
         authUrl,
+        requestedView: 'invites', // Indicate which view was requested
       },
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
@@ -622,6 +623,7 @@ async function handleGetConflictingEvents(
       structuredContent: {
         authRequired: true,
         authUrl,
+        requestedView: 'conflicts', // Indicate which view was requested
       },
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
