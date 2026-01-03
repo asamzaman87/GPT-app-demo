@@ -69,6 +69,22 @@ export function AuthView({ initialAuthData }: AuthViewProps) {
     }
   };
 
+  const handleViewConflicts = async () => {
+    try {
+      setIsLoadingInvites(true);
+      const result = await callTool('get_conflicting_events', {}) as { structuredContent?: PendingInvitesOutput };
+      if (result?.structuredContent) {
+        setInvitesData(result.structuredContent);
+        setWidgetState({ view: 'conflicts', conflicts: result.structuredContent });
+        navigate('/conflicts');
+      }
+    } catch (err) {
+      console.error('[Widget] Failed to get conflicts:', err);
+    } finally {
+      setIsLoadingInvites(false);
+    }
+  };
+
   // Connected State
   if (isAuthenticated) {
     return (
@@ -98,13 +114,24 @@ export function AuthView({ initialAuthData }: AuthViewProps) {
               <div className={`size-8 m-auto rounded-full border-2 border-t-transparent animate-spin ${theme.spinner(isDark)}`} />
             </>
           ) : (
-            <button className={`w-full bg-white h-12 flex items-center justify-center gap-3 font-medium rounded-xl text-black ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}
-            onClick={handleViewInvites}
-            disabled={isLoadingInvites}
-            >
-              <Calendar />
-              View Pending Invites
-            </button>
+            <div className="space-y-3">
+              <button 
+                className={`w-full bg-white h-12 flex items-center justify-center gap-3 font-medium rounded-xl text-black ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}
+                onClick={handleViewInvites}
+                disabled={isLoadingInvites}
+              >
+                <Calendar />
+                View Pending Invites
+              </button>
+              <button 
+                className={`w-full h-12 flex items-center justify-center gap-3 font-medium rounded-xl ${theme.textPrimary(isDark)} ${theme.buttonShadow()} ${theme.buttonBorder(isDark)}`}
+                onClick={handleViewConflicts}
+                disabled={isLoadingInvites}
+              >
+                <span className="text-xl">⚠️</span>
+                Show Conflicting Events
+              </button>
+            </div>
           )}
       </div>
     );

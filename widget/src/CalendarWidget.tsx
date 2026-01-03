@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useOpenAI } from './useOpenAI';
 import { WidgetContext, useWidget, type WidgetContextType } from './WidgetContext';
-import { AuthView, InvitesView } from './components';
+import { AuthView, InvitesView, ConflictsView } from './components';
 import { theme } from './theme';
 import type { AuthStatusOutput, PendingInvitesOutput } from './types';
 import './main.css';
@@ -10,7 +10,7 @@ import './main.css';
 // ============================================
 // Main Widget with Router
 // ============================================
-function WidgetRouter({ initialData }: { initialData: unknown }) {
+function WidgetRouter({ initialData, viewType }: { initialData: unknown; viewType?: string }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { setAuthData, setInvitesData, authData } = useWidget();
@@ -26,14 +26,27 @@ function WidgetRouter({ initialData }: { initialData: unknown }) {
     
     const data = initialData as Record<string, unknown>;
     console.log('[Widget] Auto-detecting data type:', Object.keys(data));
+    console.log('[Widget] View type from widgetState:', viewType);
     
-    // Check if it's invites data (has 'invites' array)
+    // Check if it's invites/conflicts data (has 'invites' array)
     if ('invites' in data && Array.isArray(data.invites)) {
-      console.log('[Widget] Detected invites data, navigating to /invites');
+      console.log('[Widget] Detected invites/conflicts data');
       setInvitesData(data as unknown as PendingInvitesOutput);
       // Also mark as authenticated since we could fetch invites
       setAuthData({ authenticated: true });
-      navigate('/invites', { replace: true });
+      
+      // Route based on the view type set in widgetState
+      if (viewType === 'conflicts') {
+        console.log('[Widget] Routing to /conflicts based on viewType');
+        navigate('/conflicts', { replace: true });
+      } else if (viewType === 'invites') {
+        console.log('[Widget] Routing to /invites based on viewType');
+        navigate('/invites', { replace: true });
+      } else {
+        // Fallback: check data structure or default to invites
+        console.log('[Widget] No viewType specified, defaulting to /invites');
+        navigate('/invites', { replace: true });
+      }
       setInitialRouteSet(true);
       return;
     }
@@ -60,7 +73,7 @@ function WidgetRouter({ initialData }: { initialData: unknown }) {
     // Unknown data type, stay on current route
     console.log('[Widget] Unknown data type, staying on current route');
     setInitialRouteSet(true);
-  }, [initialData, initialRouteSet, navigate, setAuthData, setInvitesData]);
+  }, [initialData, initialRouteSet, navigate, setAuthData, setInvitesData, viewType]);
 
   // Derive initial auth data for AuthView
   const initialAuthData: AuthStatusOutput | null = (() => {
@@ -84,6 +97,7 @@ function WidgetRouter({ initialData }: { initialData: unknown }) {
     <Routes>
       <Route path="/" element={<AuthView initialAuthData={initialAuthData} />} />
       <Route path="/invites" element={<InvitesView />} />
+      <Route path="/conflicts" element={<ConflictsView />} />
     </Routes>
   );
 }
@@ -94,6 +108,9 @@ export default function CalendarWidget() {
   
   const [authData, setAuthData] = useState<AuthStatusOutput | null>(null);
   const [invitesData, setInvitesData] = useState<PendingInvitesOutput | null>(null);
+  
+  // Get the view from widgetState (set by the tool handlers)
+  const widgetStateView = (openai?.widgetState as any)?.view as string | undefined;
 
   // Only restore from widgetState if there's no fresh data from the tool call
   useEffect(() => {
@@ -105,12 +122,14 @@ export default function CalendarWidget() {
       email?: string;
       view?: string;
       invites?: PendingInvitesOutput;
+      conflicts?: PendingInvitesOutput;
     } | null;
     
     if (state?.authenticated) {
       setAuthData({ authenticated: true, email: state.email || undefined });
     }
     if (state?.invites) setInvitesData(state.invites);
+    if (state?.conflicts) setInvitesData(state.conflicts);
   }, [openai?.widgetState, data]);
 
   const contextValue: WidgetContextType = {
@@ -148,7 +167,7 @@ export default function CalendarWidget() {
   return (
     <WidgetContext.Provider value={contextValue}>
       <BrowserRouter>
-        <WidgetRouter initialData={data} />
+        <WidgetRouter initialData={data} viewType={widgetStateView} />
       </BrowserRouter>
     </WidgetContext.Provider>
   );
