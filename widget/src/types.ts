@@ -31,6 +31,7 @@ export interface PendingInvitesOutput {
   authRequired?: boolean;
   authUrl?: string;
   error?: string;
+  view?: 'invites' | 'conflicts'; // Indicates which view to show
 }
 
 export interface AuthStatusOutput {

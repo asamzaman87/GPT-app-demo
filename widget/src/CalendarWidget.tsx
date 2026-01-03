@@ -31,20 +31,28 @@ function WidgetRouter({ initialData, viewType }: { initialData: unknown; viewTyp
     // Check if it's invites/conflicts data (has 'invites' array)
     if ('invites' in data && Array.isArray(data.invites)) {
       console.log('[Widget] Detected invites/conflicts data');
-      setInvitesData(data as unknown as PendingInvitesOutput);
+      const invitesOutput = data as unknown as PendingInvitesOutput;
+      setInvitesData(invitesOutput);
       // Also mark as authenticated since we could fetch invites
       setAuthData({ authenticated: true });
       
-      // Route based on the view type set in widgetState
-      if (viewType === 'conflicts') {
-        console.log('[Widget] Routing to /conflicts based on viewType');
+      // Route based on: 1) view field in data, 2) viewType from widgetState, 3) default to invites
+      const viewFromData = invitesOutput.view;
+      if (viewFromData === 'conflicts') {
+        console.log('[Widget] Routing to /conflicts based on data.view');
+        navigate('/conflicts', { replace: true });
+      } else if (viewFromData === 'invites') {
+        console.log('[Widget] Routing to /invites based on data.view');
+        navigate('/invites', { replace: true });
+      } else if (viewType === 'conflicts') {
+        console.log('[Widget] Routing to /conflicts based on widgetState viewType');
         navigate('/conflicts', { replace: true });
       } else if (viewType === 'invites') {
-        console.log('[Widget] Routing to /invites based on viewType');
+        console.log('[Widget] Routing to /invites based on widgetState viewType');
         navigate('/invites', { replace: true });
       } else {
-        // Fallback: check data structure or default to invites
-        console.log('[Widget] No viewType specified, defaulting to /invites');
+        // Fallback: default to invites
+        console.log('[Widget] No view specified, defaulting to /invites');
         navigate('/invites', { replace: true });
       }
       setInitialRouteSet(true);

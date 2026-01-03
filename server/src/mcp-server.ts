@@ -434,9 +434,11 @@ async function handleGetPendingReservations(
         invites: result.invites,
         dateRange: result.dateRange,
         totalCount: result.totalCount,
+        view: 'invites', // Indicate this is invites data
       },
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
+        'openai/widgetState': { view: 'invites' }, // Set widget state
       },
       isError: false,
     };
@@ -646,9 +648,11 @@ async function handleGetConflictingEvents(
         invites: result.invites,
         dateRange: result.dateRange,
         totalCount: result.totalCount,
+        view: 'conflicts', // Indicate this is conflicts data
       },
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
+        'openai/widgetState': { view: 'conflicts' }, // Set widget state
       },
       isError: false,
     };
