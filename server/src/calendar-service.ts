@@ -97,8 +97,11 @@ function eventToPendingInvite(event: calendar_v3.Schema$Event, userEmail: string
     (a) => a.email?.toLowerCase() === userEmail.toLowerCase()
   );
   
+  // Check if user is the creator (for group calendar events)
+  const isCreator = event.creator?.email?.toLowerCase() === userEmail.toLowerCase();
+  
   // Skip if user is not an attendee or is the organizer
-  if (!userAttendee || userAttendee.organizer) {
+  if (!userAttendee || userAttendee.organizer || isCreator) {
     return null;
   }
   
@@ -126,7 +129,8 @@ function eventToPendingInvite(event: calendar_v3.Schema$Event, userEmail: string
       status: a.responseStatus || 'unknown',
       comment: a.comment || null,
       self: a.email?.toLowerCase() === userEmail.toLowerCase(),
-      organizer: a.organizer || false,
+      // Mark as organizer if they have the flag OR if they're the creator
+      organizer: a.organizer || (a.email?.toLowerCase() === userEmail.toLowerCase() && isCreator),
     })),
     calendarLink: event.htmlLink || '',
     userComment: userAttendee.comment || null, // Include the user's own comment
@@ -400,10 +404,15 @@ export async function rescheduleEvent(
     
     const event = eventResponse.data;
     
-    // Check if user is the organizer
+    // Check if user is the organizer or creator
+    // For group calendars, the organizer might be the calendar itself, so also check creator
     const isOrganizer = event.organizer?.email?.toLowerCase() === userEmail.toLowerCase();
+    const isCreator = event.creator?.email?.toLowerCase() === userEmail.toLowerCase();
+    const hasOrganizerFlag = event.attendees?.some(
+      a => a.email?.toLowerCase() === userEmail.toLowerCase() && a.organizer === true
+    );
     
-    if (!isOrganizer) {
+    if (!isOrganizer && !isCreator && !hasOrganizerFlag) {
       throw new Error('Only the organizer can reschedule this event');
     }
     
@@ -645,6 +654,9 @@ function eventToConflictFormat(event: calendar_v3.Schema$Event, userEmail: strin
     (a) => a.email?.toLowerCase() === userEmail.toLowerCase()
   );
   
+  // Check if user is the creator (for group calendar events)
+  const isCreator = event.creator?.email?.toLowerCase() === userEmail.toLowerCase();
+  
   const startInfo = formatDateTime(event.start || {});
   const endInfo = formatDateTime(event.end || {});
   
@@ -664,7 +676,8 @@ function eventToConflictFormat(event: calendar_v3.Schema$Event, userEmail: strin
       status: a.responseStatus || 'unknown',
       comment: a.comment || null,
       self: a.email?.toLowerCase() === userEmail.toLowerCase(),
-      organizer: a.organizer || false,
+      // Mark as organizer if they have the flag OR if they're the creator
+      organizer: a.organizer || (a.email?.toLowerCase() === userEmail.toLowerCase() && isCreator),
     })),
     calendarLink: event.htmlLink || '',
     userComment: userAttendee?.comment || null,

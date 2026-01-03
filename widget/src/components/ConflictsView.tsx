@@ -291,6 +291,7 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                       <span>👤</span>
                       <span>
                         {event.organizerName || event.organizerEmail}
+                        {event.organizerEmail?.includes('@group.calendar.google.com') && ' Calendar'}
                         {event.organizerEmail === event.attendees?.find(a => a.self)?.email && ' (You)'}
                       </span>
                     </div>
@@ -330,8 +331,9 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                     </div>
                     <p className={`text-sm font-medium mt-1 ${theme.textPrimary(isDark)}`}>
                       {event.organizerName ? `${event.organizerName}` : event.organizerEmail}
+                      {event.organizerEmail?.includes('@group.calendar.google.com') && ' Calendar'}
                     </p>
-                    {event.organizerName && (
+                    {event.organizerName && !event.organizerEmail?.includes('@group.calendar.google.com') && (
                       <p className={`text-xs mt-0.5 ${theme.textPrimary(isDark)}`}>{event.organizerEmail}</p>
                     )}
                   </div>

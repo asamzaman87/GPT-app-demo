@@ -109,8 +109,9 @@ function InviteCard({ invite, onRespond, onCommentAdded, isDark, index, total }:
         </div>
         <p className={`text-sm font-medium mt-1 ${theme.textPrimary(isDark)}`}>
           {invite.organizerName ? `${invite.organizerName}` : invite.organizerEmail}
+          {invite.organizerEmail?.includes('@group.calendar.google.com') && ' Calendar'}
         </p>
-        {invite.organizerName && (
+        {invite.organizerName && !invite.organizerEmail?.includes('@group.calendar.google.com') && (
           <p className={`text-xs mt-0.5 ${theme.textPrimary(isDark)}`}>{invite.organizerEmail}</p>
         )}
       </div>
