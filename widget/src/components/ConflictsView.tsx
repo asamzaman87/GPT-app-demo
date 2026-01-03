@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@openai/apps-sdk-ui/components/Button';
 import { Badge } from '@openai/apps-sdk-ui/components/Badge';
-import { Calendar, Check, ArrowRotateCcw } from '@openai/apps-sdk-ui/components/Icon';
+import { Check, ArrowRotateCcw } from '@openai/apps-sdk-ui/components/Icon';
 import { useWidget } from '../WidgetContext';
 import { theme } from '../theme';
 import { DateRangeSelector } from './DateRangeSelector';
@@ -105,17 +105,14 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
     }
   };
 
-  const handleReschedule = async (event: PendingInvite) => {
-    const state = getEventState(event.eventId);
-    if (!state.newStartTime || !state.newEndTime) return;
-    
+  const handleReschedule = async (event: PendingInvite, startISO: string, endISO: string) => {
     updateEventState(event.eventId, { isRescheduling: true });
     try {
       await callTool('reschedule_event', {
         event_id: event.eventId,
         event_title: event.summary || 'this event',
-        new_start_time: state.newStartTime,
-        new_end_time: state.newEndTime,
+        new_start_time: startISO,
+        new_end_time: endISO,
       });
       updateEventState(event.eventId, { 
         rescheduled: true,
@@ -165,8 +162,83 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
     }
   };
 
-  const conflictStart = new Date(group.timeRange.start);
-  const conflictEnd = new Date(group.timeRange.end);
+  const handleStartTimeChange = (eventId: string, newStartTime: string, event: PendingInvite) => {
+    const state = getEventState(eventId);
+    const currentStartTime = state.newStartTime;
+    const currentEndTime = state.newEndTime;
+    
+    if (newStartTime && currentStartTime && currentEndTime) {
+      // Calculate the current duration between start and end
+      const currentStartDate = new Date(currentStartTime);
+      const currentEndDate = new Date(currentEndTime);
+      const duration = currentEndDate.getTime() - currentStartDate.getTime();
+      
+      // Apply the same duration to the new start time
+      const newStartDate = new Date(newStartTime);
+      const newEndDate = new Date(newStartDate.getTime() + duration);
+      
+      // Format for datetime-local input (YYYY-MM-DDTHH:mm) in local time
+      const year = newEndDate.getFullYear();
+      const month = String(newEndDate.getMonth() + 1).padStart(2, '0');
+      const day = String(newEndDate.getDate()).padStart(2, '0');
+      const hours = String(newEndDate.getHours()).padStart(2, '0');
+      const minutes = String(newEndDate.getMinutes()).padStart(2, '0');
+      const newEndTimeStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+      
+      updateEventState(eventId, { 
+        newStartTime: newStartTime,
+        newEndTime: newEndTimeStr
+      });
+      return;
+    }
+    
+    updateEventState(eventId, { newStartTime: newStartTime });
+  };
+
+  const handleEndTimeChange = (eventId: string, newEndTime: string) => {
+    const state = getEventState(eventId);
+    const currentStartTime = state.newStartTime;
+    
+    // Prevent setting end time before start time
+    if (newEndTime && currentStartTime) {
+      const startDate = new Date(currentStartTime);
+      const endDate = new Date(newEndTime);
+      
+      if (endDate <= startDate) {
+        // Don't update if end time would be before or equal to start time
+        return;
+      }
+    }
+    
+    updateEventState(eventId, { newEndTime: newEndTime });
+  };
+
+  const handleDateTimeClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    try {
+      (e.target as HTMLInputElement).showPicker?.();
+    } catch (err) {
+      // Fallback for browsers that don't support showPicker()
+      console.log('showPicker not supported');
+    }
+  };
+
+  const handleRescheduleClick = (eventId: string, event: PendingInvite) => {
+    const state = getEventState(eventId);
+    
+    // Validate that start time is before end time
+    const startDate = new Date(state.newStartTime);
+    const endDate = new Date(state.newEndTime);
+    
+    if (startDate >= endDate) {
+      console.error('Start time must be before end time');
+      return;
+    }
+    
+    // Convert datetime-local to ISO format with seconds
+    const startISO = startDate.toISOString();
+    const endISO = endDate.toISOString();
+    handleReschedule(event, startISO, endISO);
+  };
 
   return (
     <div className={`rounded-xl border-2 border-red-500 p-4 ${theme.card(isDark)}`}>
@@ -458,15 +530,8 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                                         <input
                                           type="datetime-local"
                                           value={state.newStartTime}
-                                          onChange={(e) => updateEventState(event.eventId, { newStartTime: e.target.value })}
-                                          onClick={(e) => {
-                                            try {
-                                              (e.target as HTMLInputElement).showPicker?.();
-                                            } catch (err) {
-                                              // Fallback for browsers that don't support showPicker()
-                                              console.log('showPicker not supported');
-                                            }
-                                          }}
+                                          onChange={(e) => handleStartTimeChange(event.eventId, e.target.value, event)}
+                                          onClick={handleDateTimeClick}
                                           className={`w-full p-2 text-sm rounded-lg border ${theme.textPrimary(isDark)} ${theme.card(isDark)} ${theme.buttonBorder(isDark)} cursor-pointer ${isDark ? 'datetime-dark-mode' : ''}`}
                                           style={isDark ? { colorScheme: 'dark' } : undefined}
                                           disabled={state.isRescheduling}
@@ -477,15 +542,8 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                                         <input
                                           type="datetime-local"
                                           value={state.newEndTime}
-                                          onChange={(e) => updateEventState(event.eventId, { newEndTime: e.target.value })}
-                                          onClick={(e) => {
-                                            try {
-                                              (e.target as HTMLInputElement).showPicker?.();
-                                            } catch (err) {
-                                              // Fallback for browsers that don't support showPicker()
-                                              console.log('showPicker not supported');
-                                            }
-                                          }}
+                                          onChange={(e) => handleEndTimeChange(event.eventId, e.target.value)}
+                                          onClick={handleDateTimeClick}
                                           className={`w-full p-2 text-sm rounded-lg border ${theme.textPrimary(isDark)} ${theme.card(isDark)} ${theme.buttonBorder(isDark)} cursor-pointer ${isDark ? 'datetime-dark-mode' : ''}`}
                                           style={isDark ? { colorScheme: 'dark' } : undefined}
                                           disabled={state.isRescheduling}
@@ -495,16 +553,7 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                                     <div className="flex gap-2 mt-3">
                                       <button 
                                         className={`flex-1 rounded-lg py-1.5 text-sm ${theme.buttonShadow()} ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)}`}
-                                        onClick={() => {
-                                          // Convert datetime-local to ISO format
-                                          const startISO = new Date(state.newStartTime).toISOString();
-                                          const endISO = new Date(state.newEndTime).toISOString();
-                                          updateEventState(event.eventId, { 
-                                            newStartTime: startISO, 
-                                            newEndTime: endISO 
-                                          });
-                                          handleReschedule(event);
-                                        }}
+                                        onClick={() => handleRescheduleClick(event.eventId, event)}
                                         disabled={!state.newStartTime || !state.newEndTime || state.isRescheduling}
                                       >
                                         {state.isRescheduling ? 'Rescheduling...' : 'Reschedule'}
