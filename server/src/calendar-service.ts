@@ -126,6 +126,7 @@ function eventToPendingInvite(event: calendar_v3.Schema$Event, userEmail: string
       status: a.responseStatus || 'unknown',
       comment: a.comment || null,
       self: a.email?.toLowerCase() === userEmail.toLowerCase(),
+      organizer: a.organizer || false,
     })),
     calendarLink: event.htmlLink || '',
     userComment: userAttendee.comment || null, // Include the user's own comment
@@ -663,6 +664,7 @@ function eventToConflictFormat(event: calendar_v3.Schema$Event, userEmail: strin
       status: a.responseStatus || 'unknown',
       comment: a.comment || null,
       self: a.email?.toLowerCase() === userEmail.toLowerCase(),
+      organizer: a.organizer || false,
     })),
     calendarLink: event.htmlLink || '',
     userComment: userAttendee?.comment || null,
