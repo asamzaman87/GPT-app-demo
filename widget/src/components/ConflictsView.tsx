@@ -111,6 +111,7 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
       await callTool('reschedule_event', {
         event_id: event.eventId,
         event_title: event.summary || 'this event',
+        calendar_id: event.calendarId || 'primary',
         new_start_time: startISO,
         new_end_time: endISO,
       });
@@ -291,7 +292,6 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                       <span>👤</span>
                       <span>
                         {event.organizerName || event.organizerEmail}
-                        {event.organizerEmail?.includes('@group.calendar.google.com') && ' Calendar'}
                         {event.organizerEmail === event.attendees?.find(a => a.self)?.email && ' (You)'}
                       </span>
                     </div>
@@ -330,8 +330,7 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                       <span className={`text-xs font-semibold uppercase tracking-wide ${theme.textPrimary(isDark)}`}>Organizer</span>
                     </div>
                     <p className={`text-sm font-medium mt-1 ${theme.textPrimary(isDark)}`}>
-                      {event.organizerName ? `${event.organizerName}` : event.organizerEmail}
-                      {event.organizerEmail?.includes('@group.calendar.google.com') && ' Calendar'}
+                      {event.organizerName || event.organizerEmail}
                     </p>
                     {event.organizerName && !event.organizerEmail?.includes('@group.calendar.google.com') && (
                       <p className={`text-xs mt-0.5 ${theme.textPrimary(isDark)}`}>{event.organizerEmail}</p>
@@ -489,12 +488,14 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                             </>
                           )}
 
-                          {/* Reschedule Section - Only for organizers */}
+                          {/* Reschedule Section - Only for organizers or creators */}
                           {(() => {
                             const userAttendee = event.attendees?.find(a => a.self);
                             const isOrganizer = userAttendee?.organizer === true;
+                            const isCreator = event.isCreator === true;
+                            const canReschedule = isOrganizer || isCreator;
                             
-                            return isOrganizer && (
+                            return canReschedule && (
                               <>
                                 {!state.showRescheduleInput ? (
                                   <button 

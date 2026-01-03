@@ -330,6 +330,10 @@ function getTools(): AppsTool[] {
             type: 'string',
             description: 'The title/summary of the event. Use this when confirming with the user. If not provided, defaults to "the event".',
           },
+          calendar_id: {
+            type: 'string',
+            description: 'The calendar ID where the event is stored. Required for group/shared calendar events. Use "primary" for primary calendar.',
+          },
           new_start_time: {
             type: 'string',
             description: 'The new start time in ISO 8601 format (e.g., "2024-01-15T14:00:00Z" or "2024-01-15T14:00:00-08:00"). Convert user\'s natural language time to this format.',
@@ -726,7 +730,7 @@ async function handleAddCommentToInvite(
  * Handle reschedule_event tool
  */
 async function handleRescheduleEvent(
-  args: { event_id: string; event_title?: string; new_start_time: string; new_end_time: string },
+  args: { event_id: string; event_title?: string; calendar_id?: string; new_start_time: string; new_end_time: string },
   userId: string
 ): Promise<AppsToolResponse> {
   if (!args.event_id) {
@@ -755,7 +759,7 @@ async function handleRescheduleEvent(
   }
 
   try {
-    const result = await rescheduleEvent(userId, args.event_id, args.new_start_time, args.new_end_time);
+    const result = await rescheduleEvent(userId, args.event_id, args.new_start_time, args.new_end_time, args.calendar_id);
     
     const eventTitle = args.event_title || result.eventSummary || 'the event';
     const startDate = new Date(args.new_start_time);
@@ -905,7 +909,7 @@ export function createMCPServer(): Server {
 
       case 'reschedule_event':
         return await handleRescheduleEvent(
-          args as { event_id: string; event_title?: string; new_start_time: string; new_end_time: string },
+          args as { event_id: string; event_title?: string; calendar_id?: string; new_start_time: string; new_end_time: string },
           userId
         ) as unknown as CallToolResult;
 
@@ -1090,7 +1094,7 @@ export async function handleMCPRequest(
 
         case 'reschedule_event':
           return await handleRescheduleEvent(
-            args as { event_id: string; event_title?: string; new_start_time: string; new_end_time: string },
+            args as { event_id: string; event_title?: string; calendar_id?: string; new_start_time: string; new_end_time: string },
             toolUserId
           );
 

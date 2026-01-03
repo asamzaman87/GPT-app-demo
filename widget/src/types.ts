@@ -19,6 +19,8 @@ export interface PendingInvite {
   }[];
   calendarLink: string;
   userComment?: string | null;
+  isCreator?: boolean; // True if the user is the creator of the event (for group calendar events)
+  calendarId?: string; // The calendar ID where this event is stored
 }
 
 // Tool output types

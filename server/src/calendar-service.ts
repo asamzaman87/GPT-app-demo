@@ -372,7 +372,8 @@ export async function rescheduleEvent(
   userId: string,
   eventId: string,
   newStartTime: string,
-  newEndTime: string
+  newEndTime: string,
+  calendarId?: string
 ): Promise<RespondToInviteResponse> {
   const calendar = await getCalendarClient(userId);
   const userEmail = getUserEmail(userId);
@@ -394,10 +395,13 @@ export async function rescheduleEvent(
   }
   
   try {
-    // First, get the event to check if user is the organizer
+    // Use provided calendarId or default to 'primary'
+    const targetCalendarId = calendarId || 'primary';
+    
+    // Get the event
     const eventResponse = await withExponentialBackoff(() =>
       calendar.events.get({
-        calendarId: 'primary',
+        calendarId: targetCalendarId,
         eventId,
       })
     );
@@ -416,10 +420,10 @@ export async function rescheduleEvent(
       throw new Error('Only the organizer can reschedule this event');
     }
     
-    // Update the event times
+    // Update the event times on the correct calendar
     await withExponentialBackoff(() =>
       calendar.events.patch({
-        calendarId: 'primary',
+        calendarId: targetCalendarId,
         eventId,
         requestBody: {
           start: {
@@ -681,6 +685,8 @@ function eventToConflictFormat(event: calendar_v3.Schema$Event, userEmail: strin
     })),
     calendarLink: event.htmlLink || '',
     userComment: userAttendee?.comment || null,
+    isCreator, // Pass creator status to frontend
+    calendarId: (event as any).calendarId, // Pass calendar ID for reschedule operations
   };
 }
 

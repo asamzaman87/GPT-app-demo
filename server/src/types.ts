@@ -67,9 +67,12 @@ export interface PendingInvite {
     status: string;
     comment?: string | null;
     self?: boolean | null;
+    organizer?: boolean | null;
   }[];
   calendarLink: string;
   userComment?: string | null; // The current user's comment on this invite
+  isCreator?: boolean; // True if the user is the creator of the event (for group calendar events)
+  calendarId?: string; // The calendar ID where this event is stored
 }
 
 export interface PendingInvitesResponse {
