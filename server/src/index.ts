@@ -36,6 +36,7 @@ import {
   getPendingInvites,
   respondToInvite,
   addCommentToInvite,
+  getConflictingEvents,
 } from './calendar-service.js';
 import { handleMCPRequest } from './mcp-server.js';
 import { deleteTokens } from './token-store.js';
@@ -286,6 +287,32 @@ app.get('/api/pending-invites', async (req: Request, res: Response) => {
     res.json({ success: true, data: invites });
   } catch (err: any) {
     console.error('Error fetching invites:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get conflicting events
+app.get('/api/conflicting-events', async (req: Request, res: Response) => {
+  const userId = DEFAULT_USER_ID;
+  const { start_date, end_date } = req.query;
+
+  if (!isAuthenticated(userId)) {
+    return res.status(401).json({
+      success: false,
+      error: 'Not authenticated',
+      authUrl: getAuthUrl(userId),
+    });
+  }
+
+  try {
+    const conflicts = await getConflictingEvents(
+      userId,
+      start_date as string | undefined,
+      end_date as string | undefined
+    );
+    res.json({ success: true, data: conflicts });
+  } catch (err: any) {
+    console.error('Error fetching conflicting events:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

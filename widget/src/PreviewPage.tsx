@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { WidgetContext, type WidgetContextType } from './WidgetContext';
-import { AuthView, InvitesView } from './components';
+import { AuthView, InvitesView, ConflictsView } from './components';
 import type { AuthStatusOutput, PendingInvitesOutput } from './types';
 import './main.css';
 
@@ -81,6 +81,65 @@ const mockEmptyInvites: PendingInvitesOutput = {
   invites: []
 };
 
+const mockConflictingEvents: PendingInvitesOutput = {
+  invites: [
+    {
+      eventId: 'conf1',
+      summary: 'Marketing Strategy Meeting',
+      description: 'Q1 marketing planning and budget allocation',
+      organizerName: 'Sarah Chen',
+      organizerEmail: 'sarah@company.com',
+      startTime: new Date(Date.now() + 86400000).toISOString(), // Tomorrow 10:00 AM
+      endTime: new Date(Date.now() + 86400000 + 3600000).toISOString(), // Tomorrow 11:00 AM
+      isAllDay: false,
+      location: 'Conference Room B',
+      calendarLink: 'https://calendar.google.com/event?eid=conf1',
+      attendees: [
+        { email: 'you@company.com', name: 'You', status: 'accepted', comment: null, self: true },
+        { email: 'sarah@company.com', name: 'Sarah Chen', status: 'accepted', comment: null, self: false },
+        { email: 'mike@company.com', name: 'Mike Wilson', status: 'accepted', comment: null, self: false },
+      ],
+      userComment: null
+    },
+    {
+      eventId: 'conf2',
+      summary: 'Engineering Sync',
+      description: 'Weekly engineering team sync - sprint planning',
+      organizerName: null,
+      organizerEmail: 'you@company.com',
+      startTime: new Date(Date.now() + 86400000 + 1800000).toISOString(), // Tomorrow 10:30 AM (overlaps!)
+      endTime: new Date(Date.now() + 86400000 + 5400000).toISOString(), // Tomorrow 11:30 AM
+      isAllDay: false,
+      location: 'Zoom: https://zoom.us/j/123456',
+      calendarLink: 'https://calendar.google.com/event?eid=conf2',
+      attendees: [
+        { email: 'you@company.com', name: 'You', status: 'accepted', comment: 'I have a conflict with marketing meeting', self: true },
+        { email: 'alex@company.com', name: 'Alex Rodriguez', status: 'accepted', comment: null, self: false },
+        { email: 'jamie@company.com', name: 'Jamie Lee', status: 'tentative', comment: 'Might join late', self: false },
+      ],
+      userComment: 'I have a conflict with marketing meeting'
+    },
+    {
+      eventId: 'conf3',
+      summary: 'Client Demo - TechCorp',
+      description: null,
+      organizerName: 'Linda Johnson',
+      organizerEmail: 'linda@company.com',
+      startTime: new Date(Date.now() + 86400000 + 2700000).toISOString(), // Tomorrow 10:45 AM (overlaps with both!)
+      endTime: new Date(Date.now() + 86400000 + 6300000).toISOString(), // Tomorrow 11:45 AM
+      isAllDay: false,
+      location: 'Meet: https://meet.google.com/abc-defg-hij',
+      calendarLink: 'https://calendar.google.com/event?eid=conf3',
+      attendees: [
+        { email: 'you@company.com', name: 'You', status: 'needsAction', comment: null, self: true },
+        { email: 'linda@company.com', name: 'Linda Johnson', status: 'accepted', comment: null, self: false },
+        { email: 'client@techcorp.com', name: 'John Smith', status: 'accepted', comment: null, self: false },
+      ],
+      userComment: null
+    }
+  ]
+};
+
 function PreviewNav() {
   const location = useLocation();
   const isDark = location.pathname.includes('dark');
@@ -90,6 +149,7 @@ function PreviewNav() {
     { path: '/auth-connected', label: 'Auth (Connected)' },
     { path: '/invites', label: 'Invites List' },
     { path: '/invites-empty', label: 'Invites (Empty)' },
+    { path: '/conflicts', label: 'Conflicting Events' },
   ];
 
   return (
@@ -165,6 +225,8 @@ function PreviewRoutes() {
     
     if (path.includes('/invites-empty')) {
       setInvitesData(mockEmptyInvites);
+    } else if (path.includes('/conflicts')) {
+      setInvitesData(mockConflictingEvents);
     } else if (path.includes('/invites')) {
       setInvitesData(mockInvites);
     }
@@ -215,6 +277,9 @@ function PreviewRoutes() {
               
               <Route path="/invites-empty" element={<InvitesView />} />
               <Route path="/invites-empty/dark" element={<InvitesView />} />
+              
+              <Route path="/conflicts" element={<ConflictsView />} />
+              <Route path="/conflicts/dark" element={<ConflictsView />} />
               
               <Route path="/" element={<AuthView initialAuthData={mockAuthNotConnected} />} />
             </Routes>

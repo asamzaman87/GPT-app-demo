@@ -409,6 +409,180 @@ export async function getEvent(
 }
 
 /**
+ * Get all conflicting events from all accessible calendars
+ */
+export async function getConflictingEvents(
+  userId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<PendingInvitesResponse> {
+  const calendar = await getCalendarClient(userId);
+  const userEmail = getUserEmail(userId);
+  
+  if (!userEmail) {
+    throw new Error('User email not found');
+  }
+  
+  // Default date range: now to 30 days from now
+  const now = new Date();
+  const defaultEnd = new Date(now);
+  defaultEnd.setDate(defaultEnd.getDate() + 30);
+  
+  const timeMin = startDate || now.toISOString();
+  const timeMax = endDate || defaultEnd.toISOString();
+  
+  try {
+    // First, get list of all accessible calendars
+    const calendarListResponse = await withExponentialBackoff(() =>
+      calendar.calendarList.list()
+    );
+    
+    const calendars = calendarListResponse.data.items || [];
+    const allEvents: calendar_v3.Schema$Event[] = [];
+    
+    // Fetch events from all calendars
+    for (const cal of calendars) {
+      if (!cal.id) continue;
+      
+      try {
+        const eventsResponse = await withExponentialBackoff(() =>
+          calendar.events.list({
+            calendarId: cal.id!,
+            timeMin,
+            timeMax,
+            singleEvents: true,
+            orderBy: 'startTime',
+            maxResults: 250,
+          })
+        );
+        
+        const events = eventsResponse.data.items || [];
+        // Add calendar info to each event
+        events.forEach(event => {
+          (event as any).calendarId = cal.id;
+          (event as any).calendarName = cal.summary;
+        });
+        allEvents.push(...events);
+      } catch (error: any) {
+        console.error(`Error fetching events from calendar ${cal.summary}:`, error);
+        // Continue with other calendars even if one fails
+      }
+    }
+    
+    // Find conflicting events
+    const conflicts: PendingInvite[] = [];
+    const processedPairs = new Set<string>();
+    
+    for (let i = 0; i < allEvents.length; i++) {
+      for (let j = i + 1; j < allEvents.length; j++) {
+        const event1 = allEvents[i];
+        const event2 = allEvents[j];
+        
+        if (!event1.id || !event2.id) continue;
+        
+        // Create a unique pair identifier
+        const pairId = [event1.id, event2.id].sort().join('|');
+        if (processedPairs.has(pairId)) continue;
+        
+        // Check if events overlap
+        if (eventsOverlap(event1, event2)) {
+          processedPairs.add(pairId);
+          
+          // Convert both events to PendingInvite format
+          const conflict1 = eventToConflictFormat(event1, userEmail);
+          const conflict2 = eventToConflictFormat(event2, userEmail);
+          
+          if (conflict1 && !conflicts.find(c => c.eventId === conflict1.eventId)) {
+            conflicts.push(conflict1);
+          }
+          if (conflict2 && !conflicts.find(c => c.eventId === conflict2.eventId)) {
+            conflicts.push(conflict2);
+          }
+        }
+      }
+    }
+    
+    // Sort by start time
+    conflicts.sort((a, b) => 
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+    
+    return {
+      invites: conflicts,
+      dateRange: {
+        start: timeMin,
+        end: timeMax,
+      },
+      totalCount: conflicts.length,
+    };
+  } catch (error: any) {
+    console.error('Error fetching conflicting events:', error);
+    
+    if (error.code === 401) {
+      throw new Error('Authentication expired. Please re-authenticate.');
+    }
+    
+    throw new Error(`Failed to fetch conflicting events: ${error.message}`);
+  }
+}
+
+/**
+ * Check if two events overlap in time
+ */
+function eventsOverlap(event1: calendar_v3.Schema$Event, event2: calendar_v3.Schema$Event): boolean {
+  const start1 = event1.start?.dateTime || event1.start?.date;
+  const end1 = event1.end?.dateTime || event1.end?.date;
+  const start2 = event2.start?.dateTime || event2.start?.date;
+  const end2 = event2.end?.dateTime || event2.end?.date;
+  
+  if (!start1 || !end1 || !start2 || !end2) return false;
+  
+  const start1Time = new Date(start1).getTime();
+  const end1Time = new Date(end1).getTime();
+  const start2Time = new Date(start2).getTime();
+  const end2Time = new Date(end2).getTime();
+  
+  // Events overlap if one starts before the other ends
+  return start1Time < end2Time && start2Time < end1Time;
+}
+
+/**
+ * Convert a calendar event to conflict format (similar to PendingInvite)
+ */
+function eventToConflictFormat(event: calendar_v3.Schema$Event, userEmail: string): PendingInvite | null {
+  if (!event.id) return null;
+  
+  const attendees = event.attendees || [];
+  const userAttendee = attendees.find(
+    (a) => a.email?.toLowerCase() === userEmail.toLowerCase()
+  );
+  
+  const startInfo = formatDateTime(event.start || {});
+  const endInfo = formatDateTime(event.end || {});
+  
+  return {
+    eventId: event.id,
+    summary: event.summary || '(No title)',
+    description: event.description || null,
+    location: event.location || null,
+    startTime: startInfo.formatted,
+    endTime: endInfo.formatted,
+    isAllDay: startInfo.isAllDay,
+    organizerEmail: event.organizer?.email || userEmail,
+    organizerName: event.organizer?.displayName || null,
+    attendees: attendees.map((a) => ({
+      email: a.email || 'Unknown',
+      name: a.displayName || null,
+      status: a.responseStatus || 'unknown',
+      comment: a.comment || null,
+      self: a.email?.toLowerCase() === userEmail.toLowerCase(),
+    })),
+    calendarLink: event.htmlLink || '',
+    userComment: userAttendee?.comment || null,
+  };
+}
+
+/**
  * Format pending invites as a text summary for MCP responses
  */
 export function formatInvitesAsText(invites: PendingInvite[]): string {

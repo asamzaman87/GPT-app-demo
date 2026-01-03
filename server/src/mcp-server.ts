@@ -12,6 +12,7 @@ import {
   getPendingInvites,
   respondToInvite,
   addCommentToInvite,
+  getConflictingEvents,
 } from './calendar-service.js';
 import { isAuthenticated, getAuthUrl, getUserEmail } from './google-auth.js';
 import fs from 'fs';
@@ -238,6 +239,41 @@ function getTools(): AppsTool[] {
       _meta: {
         'openai/visibility': 'public',
         'openai/widgetAccessible': false,
+      },
+    },
+    {
+      name: 'get_conflicting_events',
+      title: 'Get Conflicting Events',
+      description: 'Find all calendar events that have time conflicts (events that overlap). This checks across all accessible calendars and returns events where the user is either an organizer or attendee. Useful for identifying scheduling conflicts and double-bookings. The results use the same format as pending invitations.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          start_date: {
+            type: 'string',
+            description: 'Start date for the search range in ISO 8601 format (e.g., "2024-01-15T00:00:00Z"). Defaults to now.',
+          },
+          end_date: {
+            type: 'string',
+            description: 'End date for the search range in ISO 8601 format (e.g., "2024-02-15T23:59:59Z"). Defaults to 30 days from now.',
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+      annotations: {
+        title: 'Get Conflicting Events',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      securitySchemes: [
+        { type: 'oauth2', scopes: ['calendar:read'] },
+      ],
+      _meta: {
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
+        'openai/visibility': 'public',
+        'openai/widgetAccessible': true,
       },
     },
     {
@@ -529,6 +565,58 @@ async function handleBatchRespondToInvites(
 }
 
 /**
+ * Handle get_conflicting_events tool
+ */
+async function handleGetConflictingEvents(
+  args: { start_date?: string; end_date?: string },
+  userId: string
+): Promise<AppsToolResponse> {
+  // Check authentication
+  if (!isAuthenticated(userId)) {
+    const authUrl = getAuthUrl(userId);
+    return {
+      content: [{ type: 'text', text: 'User needs to authenticate with Google Calendar.' }],
+      structuredContent: {
+        authRequired: true,
+        authUrl,
+      },
+      _meta: {
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
+      },
+      isError: false,
+    };
+  }
+
+  try {
+    const result = await getConflictingEvents(userId, args.start_date, args.end_date);
+    
+    return {
+      content: [{ 
+        type: 'text', 
+        text: result.invites.length > 0 
+          ? `Found ${result.invites.length} conflicting event(s).`
+          : 'No conflicting events found.'
+      }],
+      structuredContent: {
+        invites: result.invites,
+        dateRange: result.dateRange,
+        totalCount: result.totalCount,
+      },
+      _meta: {
+        'openai/outputTemplate': 'ui://widget/calendar-widget.html',
+      },
+      isError: false,
+    };
+  } catch (error: any) {
+    return {
+      content: [{ type: 'text', text: `Error: ${error.message}` }],
+      structuredContent: { error: error.message },
+      isError: true,
+    };
+  }
+}
+
+/**
  * Handle add_comment_to_invite tool (adds a note to invite)
  */
 async function handleAddCommentToInvite(
@@ -688,6 +776,12 @@ export function createMCPServer(): Server {
       case 'batch_respond_to_invites':
         return await handleBatchRespondToInvites(
           args as { invites: Array<{ event_id: string; event_title?: string; response: 'accepted' | 'declined' | 'tentative' }> },
+          userId
+        ) as unknown as CallToolResult;
+
+      case 'get_conflicting_events':
+        return await handleGetConflictingEvents(
+          args as { start_date?: string; end_date?: string },
           userId
         ) as unknown as CallToolResult;
 
@@ -861,6 +955,12 @@ export async function handleMCPRequest(
         case 'batch_respond_to_invites':
           return await handleBatchRespondToInvites(
             args as { invites: Array<{ event_id: string; event_title?: string; response: 'accepted' | 'declined' | 'tentative' }> },
+            toolUserId
+          );
+
+        case 'get_conflicting_events':
+          return await handleGetConflictingEvents(
+            args as { start_date?: string; end_date?: string },
             toolUserId
           );
 
