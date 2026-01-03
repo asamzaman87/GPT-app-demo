@@ -440,52 +440,48 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
                           )}
 
                           {/* Note Section - Always shown */}
-                          {state.status === 'idle' && (
-                            <>
-                              {!state.showCommentInput ? (
+                          {!state.showCommentInput ? (
+                            <button 
+                              onClick={() => {
+                                updateEventState(event.eventId, { 
+                                  showCommentInput: true,
+                                  comment: hasExistingComment ? (event.userComment || '') : ''
+                                });
+                              }}
+                              className={`w-full text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors ${theme.card(isDark)}`}
+                            >
+                              {hasExistingComment ? 'Edit note' : 'Add a note'}
+                            </button>
+                          ) : (
+                            <div className={`mt-2 p-3 rounded-lg ${theme.card(isDark)}`}>
+                              <textarea
+                                value={state.comment}
+                                onChange={(e) => updateEventState(event.eventId, { comment: e.target.value })}
+                                placeholder={hasExistingComment 
+                                  ? "Edit your note..." 
+                                  : "Add a note (e.g., I might be 5 minutes late)"
+                                }
+                                className={`w-full p-2 text-sm rounded-lg border resize-none ${theme.textPrimary(isDark)} ${theme.card(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
+                                rows={3}
+                                disabled={state.isAddingComment}
+                              />
+                              <div className="flex gap-2 mt-2">
                                 <button 
-                                  onClick={() => {
-                                    updateEventState(event.eventId, { 
-                                      showCommentInput: true,
-                                      comment: hasExistingComment ? (event.userComment || '') : ''
-                                    });
-                                  }}
-                                  className={`w-full text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors ${theme.card(isDark)}`}
+                                  className={`flex-1 rounded-lg py-1 ${theme.buttonShadow()} ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)}`}
+                                  onClick={() => handleAddComment(event)}
+                                  disabled={!state.comment.trim() || state.isAddingComment}
                                 >
-                                  {hasExistingComment ? 'Edit note' : 'Add a note'}
+                                  {state.isAddingComment ? 'Sending...' : 'Send'}
                                 </button>
-                              ) : (
-                                <div className={`mt-2 p-3 rounded-lg ${theme.card(isDark)}`}>
-                                  <textarea
-                                    value={state.comment}
-                                    onChange={(e) => updateEventState(event.eventId, { comment: e.target.value })}
-                                    placeholder={hasExistingComment 
-                                      ? "Edit your note..." 
-                                      : "Add a note (e.g., I might be 5 minutes late)"
-                                    }
-                                    className={`w-full p-2 text-sm rounded-lg border resize-none ${theme.textPrimary(isDark)} ${theme.card(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
-                                    rows={3}
-                                    disabled={state.isAddingComment}
-                                  />
-                                  <div className="flex gap-2 mt-2">
-                                    <button 
-                                      className={`flex-1 rounded-lg py-1 ${theme.buttonShadow()} ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)}`}
-                                      onClick={() => handleAddComment(event)}
-                                      disabled={!state.comment.trim() || state.isAddingComment}
-                                    >
-                                      {state.isAddingComment ? 'Sending...' : 'Send'}
-                                    </button>
-                                    <button 
-                                      className={`rounded-lg py-1 px-2 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
-                                      onClick={() => updateEventState(event.eventId, { showCommentInput: false, comment: '' })}
-                                      disabled={state.isAddingComment}
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </>
+                                <button 
+                                  className={`rounded-lg py-1 px-2 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
+                                  onClick={() => updateEventState(event.eventId, { showCommentInput: false, comment: '' })}
+                                  disabled={state.isAddingComment}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
                           )}
 
                           {/* Reschedule Section - Only for organizers or creators */}

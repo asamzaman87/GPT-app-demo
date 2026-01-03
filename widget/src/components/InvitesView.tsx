@@ -200,63 +200,61 @@ function InviteCard({ invite, onRespond, onCommentAdded, isDark, index, total }:
         )}
         
         {status === 'idle' && (
-          <>
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              <Button className={`rounded-xl py-4 text-white ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`} color="success" size="sm" block onClick={() => handleRespond('accepted')}>Accept</Button>
-              <Button className={`rounded-xl py-4 text-white ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`} color="warning" size="sm" block onClick={() => handleRespond('tentative')}>Maybe</Button>
-              <Button className={`rounded-xl py-4 text-white ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`} color="danger" size="sm" block onClick={() => handleRespond('declined')}>Decline</Button>
-            </div>
-            
-            {/* Note Section (matches Google Calendar UI) */}
-            {!showCommentInput ? (
+          <div className="grid grid-cols-3 gap-2 mb-2">
+            <Button className={`rounded-xl py-4 text-white ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`} color="success" size="sm" block onClick={() => handleRespond('accepted')}>Accept</Button>
+            <Button className={`rounded-xl py-4 text-white ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`} color="warning" size="sm" block onClick={() => handleRespond('tentative')}>Maybe</Button>
+            <Button className={`rounded-xl py-4 text-white ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`} color="danger" size="sm" block onClick={() => handleRespond('declined')}>Decline</Button>
+          </div>
+        )}
+        
+        {/* Note Section (matches Google Calendar UI) - Always shown */}
+        {!showCommentInput ? (
+          <button 
+            onClick={() => {
+              setShowCommentInput(true);
+              // Pre-fill with existing note if editing
+              if (hasExistingComment) {
+                setComment(invite.userComment || '');
+              }
+            }}
+            className={`w-full text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors`}
+          >
+            {hasExistingComment ? 'Edit note' : 'Add a note'}
+          </button>
+        ) : (
+          <div className={`mt-2 p-3 rounded-lg ${theme.card(isDark)}`}>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder={hasExistingComment 
+                ? "Edit your note..." 
+                : "Add a note (e.g., I might be 5 minutes late)"
+              }
+              className={`w-full p-2 text-sm rounded-lg border resize-none ${theme.textPrimary(isDark)} ${theme.card(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
+              rows={3}
+              disabled={isAddingComment}
+            />
+            <div className="flex gap-2 mt-2">
               <button 
-                onClick={() => {
-                  setShowCommentInput(true);
-                  // Pre-fill with existing note if editing
-                  if (hasExistingComment) {
-                    setComment(invite.userComment || '');
-                  }
-                }}
-                className={`w-full text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors`}
+                className={`flex-1 rounded-lg py-1 ${theme.buttonShadow()} ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)}`}
+                color="primary" 
+                onClick={handleAddComment}
+                disabled={!comment.trim() || isAddingComment}
               >
-                {hasExistingComment ? 'Edit note' : 'Add a note'}
+                {isAddingComment ? 'Sending...' : 'Send'}
               </button>
-            ) : (
-              <div className={`mt-2 p-3 rounded-lg ${theme.card(isDark)}`}>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder={hasExistingComment 
-                    ? "Edit your note..." 
-                    : "Add a note (e.g., I might be 5 minutes late)"
-                  }
-                  className={`w-full p-2 text-sm rounded-lg border resize-none ${theme.textPrimary(isDark)} ${theme.card(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
-                  rows={3}
-                  disabled={isAddingComment}
-                />
-                <div className="flex gap-2 mt-2">
-                  <button 
-                    className={`flex-1 rounded-lg py-1 ${theme.buttonShadow()} ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)}`}
-                    color="primary" 
-                    onClick={handleAddComment}
-                    disabled={!comment.trim() || isAddingComment}
-                  >
-                    {isAddingComment ? 'Sending...' : 'Send'}
-                  </button>
-                  <button 
-                    className={`rounded-lg py-1 px-2 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
-                    onClick={() => {
-                      setShowCommentInput(false);
-                      setComment('');
-                    }}
-                    disabled={isAddingComment}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+              <button 
+                className={`rounded-lg py-1 px-2 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
+                onClick={() => {
+                  setShowCommentInput(false);
+                  setComment('');
+                }}
+                disabled={isAddingComment}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
         {status === 'loading' && <div className={`text-center py-2 text-sm ${theme.textPrimary(isDark)}`}>Sending...</div>}
         {(status === 'accepted' || status === 'declined' || status === 'tentative') && (
