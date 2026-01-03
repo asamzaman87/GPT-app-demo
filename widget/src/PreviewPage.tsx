@@ -74,15 +74,27 @@ const mockInvites: PendingInvitesOutput = {
       ],
       userComment: null
     }
-  ]
+  ],
+  dateRange: {
+    start: new Date().toISOString(),
+    end: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 2 weeks from now
+  }
 };
 
 const mockEmptyInvites: PendingInvitesOutput = {
-  invites: []
+  invites: [],
+  dateRange: {
+    start: new Date().toISOString(),
+    end: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 2 weeks from now
+  }
 };
 
 const mockEmptyConflicts: PendingInvitesOutput = {
-  invites: []
+  invites: [],
+  dateRange: {
+    start: new Date().toISOString(),
+    end: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 2 weeks from now
+  }
 };
 
 const mockConflictingEvents: PendingInvitesOutput = {
@@ -141,7 +153,11 @@ const mockConflictingEvents: PendingInvitesOutput = {
       ],
       userComment: null
     }
-  ]
+  ],
+  dateRange: {
+    start: new Date().toISOString(),
+    end: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 2 weeks from now
+  }
 };
 
 function PreviewNav() {

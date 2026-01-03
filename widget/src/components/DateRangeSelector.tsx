@@ -6,14 +6,51 @@ interface DateRangeSelectorProps {
   isDark: boolean;
   isRefreshing: boolean;
   onRangeChange: (startDate?: string, endDate?: string) => void;
+  currentDateRange?: { start: string; end: string } | null;
 }
 
-export function DateRangeSelector({ isDark, isRefreshing, onRangeChange }: DateRangeSelectorProps) {
+export function DateRangeSelector({ isDark, isRefreshing, onRangeChange, currentDateRange }: DateRangeSelectorProps) {
   const [showDateRange, setShowDateRange] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  
+  // Determine which preset option to show based on current date range
+  const getCurrentRangeValue = () => {
+    if (!currentDateRange) return 'next-2-weeks';
+    
+    const start = new Date(currentDateRange.start);
+    const end = new Date(currentDateRange.end);
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Check if it matches a preset range
+    const now = new Date();
+    const isFromNow = Math.abs(start.getTime() - now.getTime()) < 86400000; // Within 1 day of now
+    
+    if (isFromNow && daysDiff >= 13 && daysDiff <= 15) {
+      return 'next-2-weeks';
+    } else if (isFromNow && daysDiff >= 28 && daysDiff <= 32) {
+      return 'next-month';
+    } else {
+      return 'custom-display';
+    }
+  };
+  
+  // Format custom date range for display
+  const formatCustomDateRange = () => {
+    if (!currentDateRange) return '';
+    const start = new Date(currentDateRange.start);
+    const end = new Date(currentDateRange.end);
+    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startStr} - ${endStr}`;
+  };
 
-  const handleQuickRange = (range: 'next-2-weeks' | 'next-month' | 'custom') => {
+  const handleQuickRange = (range: 'next-2-weeks' | 'next-month' | 'custom' | 'custom-display') => {
+    if (range === 'custom-display') {
+      // Already showing a custom range, don't do anything
+      return;
+    }
+    
     const now = new Date();
     let start = '';
     let end = '';
@@ -88,35 +125,34 @@ export function DateRangeSelector({ isDark, isRefreshing, onRangeChange }: DateR
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              className={`flex-1 rounded-xl py-2 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
-              color="primary"
-              size="sm"
+            <button
+              className={`flex-1 rounded-xl py-1 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
               onClick={handleCustomDateRange}
               disabled={!startDate || !endDate}
             >
               Apply
-            </Button>
-            <Button
-              className={`rounded-xl px-2 py-2 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
-              variant="outline"
-              color="secondary"
-              size="sm"
+            </button>
+            <button
+              className={`rounded-xl px-2 py-1 ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()}`}
               onClick={handleClearDateRange}
             >
               Cancel
-            </Button>
+            </button>
           </div>
         </div>
       ) : (
         <select
           onChange={(e) => handleQuickRange(e.target.value as any)}
           disabled={isRefreshing}
+          value={getCurrentRangeValue()}
           className={`w-full px-3 py-2 text-sm rounded-lg border ${
             theme.card(isDark)} ${theme.textPrimary(isDark)}`}
         >
           <option value="next-2-weeks">Next 2 Weeks (Default)</option>
           <option value="next-month">Next Month</option>
+          {getCurrentRangeValue() === 'custom-display' && (
+            <option value="custom-display">{formatCustomDateRange()}</option>
+          )}
           <option value="custom">Custom Date Range...</option>
         </select>
       )}

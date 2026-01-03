@@ -314,7 +314,7 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
 
                   <button 
                     onClick={() => setExpandedEventId(event.eventId)}
-                    className={`w-full mt-2 text-xs py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors ${theme.card(isDark)}`}
+                    className={`w-full mt-2 text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors ${theme.card(isDark)}`}
                   >
                     Show Details
                   </button>
@@ -596,7 +596,7 @@ function ConflictCard({ group, isDark, onRespond, onCommentAdded, onRescheduled 
 
                   <button 
                     onClick={() => setExpandedEventId(null)}
-                    className={`w-full mt-2 text-xs py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors ${theme.card(isDark)}`}
+                    className={`w-full mt-2 text-sm py-2 px-3 rounded-lg ${theme.textPrimary(isDark)} ${theme.buttonBorder(isDark)} ${theme.buttonShadow()} hover:bg-opacity-80 transition-colors ${theme.card(isDark)}`}
                   >
                     Hide Details
                   </button>
@@ -752,6 +752,7 @@ export function ConflictsView() {
               isDark={isDark}
               isRefreshing={isRefreshing}
               onRangeChange={handleRefresh}
+              currentDateRange={invitesData.dateRange || null}
             />
           </div>
 
@@ -801,6 +802,7 @@ export function ConflictsView() {
               isDark={isDark}
               isRefreshing={isRefreshing}
               onRangeChange={handleRefresh}
+              currentDateRange={invitesData.dateRange || null}
             />
           </div>
 

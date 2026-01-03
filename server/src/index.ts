@@ -218,7 +218,6 @@ app.get('/oauth/callback', async (req: Request, res: Response) => {
     <h1>${success ? 'Google Calendar Connected!' : 'Connection Failed'}</h1>
     ${email ? `<p class="email">${email}</p>` : ''}
     <p>${message}</p>
-    <a href="https://chatgpt.com" class="btn">Return to ChatGPT</a>
     <p class="note">This tab will close automatically...</p>
   </div>
   <script>

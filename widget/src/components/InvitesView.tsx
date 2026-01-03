@@ -354,6 +354,7 @@ export function InvitesView() {
               isDark={isDark}
               isRefreshing={isRefreshing}
               onRangeChange={handleRefresh}
+              currentDateRange={invitesData.dateRange || null}
             />
           </div>
 
@@ -402,6 +403,7 @@ export function InvitesView() {
               isDark={isDark}
               isRefreshing={isRefreshing}
               onRangeChange={handleRefresh}
+              currentDateRange={invitesData.dateRange || null}
             />
           </div>
 
