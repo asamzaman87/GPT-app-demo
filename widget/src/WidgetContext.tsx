@@ -12,6 +12,7 @@ export interface WidgetContextType {
   setAuthData: (data: AuthStatusOutput | null) => void;
   invitesData: PendingInvitesOutput | null;
   setInvitesData: (data: PendingInvitesOutput | null) => void;
+  widgetStateView?: string;
 }
 
 export const WidgetContext = createContext<WidgetContextType | null>(null);

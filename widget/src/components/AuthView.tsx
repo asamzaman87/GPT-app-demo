@@ -11,7 +11,7 @@ interface AuthViewProps {
 }
 
 export function AuthView({ initialAuthData }: AuthViewProps) {
-  const { isDark, callTool, openExternal, setWidgetState, setInvitesData, notifyHeight, authData, setAuthData } = useWidget();
+  const { isDark, callTool, openExternal, setWidgetState, setInvitesData, notifyHeight, authData, setAuthData, widgetStateView } = useWidget();
   const navigate = useNavigate();
   const [isPolling, setIsPolling] = useState(false);
   const [isLoadingInvites, setIsLoadingInvites] = useState(false);
@@ -19,8 +19,7 @@ export function AuthView({ initialAuthData }: AuthViewProps) {
   const currentAuth = authData || initialAuthData;
   const isAuthenticated = currentAuth?.authenticated ?? false;
   
-  // Check which view was originally requested (from authRequired response)
-  const requestedView = (currentAuth as any)?.requestedView as string | undefined;
+  const requestedView = (currentAuth as any)?.requestedView as string | undefined || widgetStateView;
 
   useEffect(() => { notifyHeight(); }, [isAuthenticated, isPolling, notifyHeight]);
 

@@ -143,6 +143,7 @@ export default function CalendarWidget() {
     setAuthData,
     invitesData,
     setInvitesData,
+    widgetStateView,
   };
 
   if (isLoading) {

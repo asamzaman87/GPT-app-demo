@@ -81,6 +81,10 @@ const mockEmptyInvites: PendingInvitesOutput = {
   invites: []
 };
 
+const mockEmptyConflicts: PendingInvitesOutput = {
+  invites: []
+};
+
 const mockConflictingEvents: PendingInvitesOutput = {
   invites: [
     {
@@ -150,6 +154,7 @@ function PreviewNav() {
     { path: '/invites', label: 'Invites List' },
     { path: '/invites-empty', label: 'Invites (Empty)' },
     { path: '/conflicts', label: 'Conflicting Events' },
+    { path: '/conflicts-empty', label: 'Conflicts (Empty)' },
   ];
 
   return (
@@ -225,6 +230,8 @@ function PreviewRoutes() {
     
     if (path.includes('/invites-empty')) {
       setInvitesData(mockEmptyInvites);
+    } else if (path.includes('/conflicts-empty')) {
+      setInvitesData(mockEmptyConflicts);
     } else if (path.includes('/conflicts')) {
       setInvitesData(mockConflictingEvents);
     } else if (path.includes('/invites')) {
@@ -257,6 +264,7 @@ function PreviewRoutes() {
     setAuthData,
     invitesData,
     setInvitesData,
+    widgetStateView: location.pathname.includes('conflicts') ? 'conflicts' : location.pathname.includes('invites') ? 'invites' : undefined,
   };
 
   return (
@@ -280,6 +288,9 @@ function PreviewRoutes() {
               
               <Route path="/conflicts" element={<ConflictsView />} />
               <Route path="/conflicts/dark" element={<ConflictsView />} />
+              
+              <Route path="/conflicts-empty" element={<ConflictsView />} />
+              <Route path="/conflicts-empty/dark" element={<ConflictsView />} />
               
               <Route path="/" element={<AuthView initialAuthData={mockAuthNotConnected} />} />
             </Routes>
