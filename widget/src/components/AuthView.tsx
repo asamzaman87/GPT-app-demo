@@ -31,8 +31,16 @@ export function AuthView({ initialAuthData }: AuthViewProps) {
       try {
         const result = await callTool('check_auth_status', {}) as { structuredContent?: AuthStatusOutput };
         if (result?.structuredContent?.authenticated) {
-          setAuthData(result.structuredContent);
-          setWidgetState({ authenticated: true, email: result.structuredContent.email });
+          const preservedRequestedView = (currentAuth as any)?.requestedView;
+          setAuthData({
+            ...result.structuredContent,
+            ...(preservedRequestedView && { requestedView: preservedRequestedView })
+          } as AuthStatusOutput);
+          setWidgetState({ 
+            authenticated: true, 
+            email: result.structuredContent.email,
+            view: preservedRequestedView || widgetStateView
+          });
           setIsPolling(false);
         }
       } catch (err) {
