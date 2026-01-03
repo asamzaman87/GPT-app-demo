@@ -13,7 +13,7 @@ import './main.css';
 function WidgetRouter({ initialData, viewType }: { initialData: unknown; viewType?: string }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { setAuthData, setInvitesData, authData } = useWidget();
+  const { setAuthData, setInvitesData, authData, setWidgetState } = useWidget();
   const [initialRouteSet, setInitialRouteSet] = useState(false);
   
   useEffect(() => {
@@ -62,10 +62,16 @@ function WidgetRouter({ initialData, viewType }: { initialData: unknown; viewTyp
     // Check if auth is required (from get_pending_reservations when not authenticated)
     if ('authRequired' in data && data.authRequired === true) {
       console.log('[Widget] Detected authRequired, showing auth view');
+      const authOutput = data as unknown as PendingInvitesOutput;
       setAuthData({ 
         authenticated: false, 
-        authUrl: data.authUrl as string | undefined 
-      });
+        authUrl: authOutput.authUrl,
+        requestedView: authOutput.view || (data as any).requestedView
+      } as AuthStatusOutput);
+      // Also set widgetState to preserve the view
+      if (authOutput.view || (data as any).requestedView) {
+        setWidgetState({ view: authOutput.view || (data as any).requestedView });
+      }
       setInitialRouteSet(true);
       return;
     }
