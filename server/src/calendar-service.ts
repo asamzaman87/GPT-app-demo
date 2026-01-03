@@ -558,12 +558,26 @@ export async function getConflictingEvents(
         );
         
         const events = eventsResponse.data.items || [];
+        
+        // Filter out events where user has declined
+        const relevantEvents = events.filter(event => {
+          const userAttendee = event.attendees?.find(a => 
+            a.email?.toLowerCase() === userEmail.toLowerCase() || a.self
+          );
+          const userStatus = userAttendee?.responseStatus || 'accepted'; // Default to accepted if no status (organizer's own events)
+          
+          // Only include events where user hasn't declined
+          // (needsAction, accepted, tentative, or no response status)
+          return userStatus !== 'declined';
+        });
+        
         // Add calendar info to each event
-        events.forEach(event => {
+        relevantEvents.forEach(event => {
           (event as any).calendarId = cal.id;
           (event as any).calendarName = cal.summary;
         });
-        allEvents.push(...events);
+        
+        allEvents.push(...relevantEvents);
       } catch (error: any) {
         console.error(`Error fetching events from calendar ${cal.summary}:`, error);
         // Continue with other calendars even if one fails
