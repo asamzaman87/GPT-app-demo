@@ -492,11 +492,11 @@ app.get('/.well-known/oauth-protected-resource', (req: Request, res: Response) =
 });
 
 // Dynamic Client Registration (RFC 7591)
-app.post('/oauth/register', (req: Request, res: Response) => {
+app.post('/oauth/register', async (req: Request, res: Response) => {
   const registrationRequest: ClientRegistrationRequest = req.body;
   
   try {
-    const response = registerClient(registrationRequest);
+    const response = await registerClient(registrationRequest);
     console.log('Dynamic client registration:', response.client_id);
     res.status(201).json(response);
   } catch (err: any) {
@@ -509,7 +509,7 @@ app.post('/oauth/register', (req: Request, res: Response) => {
 });
 
 // OAuth Authorization Endpoint (for authorization code flow with PKCE)
-app.get('/oauth/authorize', (req: Request, res: Response) => {
+app.get('/oauth/authorize', async (req: Request, res: Response) => {
   const { 
     client_id, 
     redirect_uri, 
@@ -522,7 +522,7 @@ app.get('/oauth/authorize', (req: Request, res: Response) => {
   } = req.query;
   
   // Validate client
-  if (!client_id || !validateClientId(client_id as string)) {
+  if (!client_id || !(await validateClientId(client_id as string))) {
     return res.status(400).json({ 
       error: 'invalid_client',
       error_description: 'Unknown or invalid client_id',
@@ -544,7 +544,7 @@ app.get('/oauth/authorize', (req: Request, res: Response) => {
   }
   
   // Generate authorization code with PKCE support and resource parameter
-  const authCode = generateAuthorizationCode(
+  const authCode = await generateAuthorizationCode(
     client_id as string,
     redirect_uri as string,
     code_challenge as string | undefined,
@@ -568,7 +568,7 @@ app.get('/oauth/authorize', (req: Request, res: Response) => {
 // ============================================
 // MCP OAuth Token Endpoint (for ChatGPT authentication)
 // ============================================
-app.post('/oauth/token', (req: Request, res: Response) => {
+app.post('/oauth/token', async (req: Request, res: Response) => {
   const { grant_type, client_id, client_secret, code, redirect_uri, code_verifier, refresh_token, resource } = req.body;
 
   // Also check Authorization header for client credentials
@@ -601,7 +601,7 @@ app.post('/oauth/token', (req: Request, res: Response) => {
     }
     
     // Validate the authorization code (with PKCE if applicable)
-    const validation = validateAuthorizationCode(
+    const validation = await validateAuthorizationCode(
       code,
       authClientId || '',
       redirect_uri,
@@ -619,7 +619,7 @@ app.post('/oauth/token', (req: Request, res: Response) => {
     const tokenResource = validation.resource || resource;
     
     // Generate new access token and refresh token
-    const { accessToken, refreshToken } = generateTokenPair(
+    const { accessToken, refreshToken } = await generateTokenPair(
       authClientId || 'chatgpt',
       validation.scope,
       tokenResource
@@ -641,7 +641,7 @@ app.post('/oauth/token', (req: Request, res: Response) => {
     }
     
     // Validate the refresh token
-    const validation = validateRefreshToken(refresh_token);
+    const validation = await validateRefreshToken(refresh_token);
     
     if (!validation.valid) {
       return res.status(401).json({
@@ -659,11 +659,11 @@ app.post('/oauth/token', (req: Request, res: Response) => {
     }
     
     // Revoke old refresh token
-    revokeRefreshToken(refresh_token);
+    await revokeRefreshToken(refresh_token);
     
     // Generate new access token and refresh token (token rotation)
     const tokenResource = validation.resource || resource;
-    const { accessToken, refreshToken: newRefreshToken } = generateTokenPair(
+    const { accessToken, refreshToken: newRefreshToken } = await generateTokenPair(
       authClientId || 'chatgpt',
       validation.scope,
       tokenResource
@@ -678,7 +678,7 @@ app.post('/oauth/token', (req: Request, res: Response) => {
   // Handle client_credentials grant type
   if (grant_type === 'client_credentials') {
     // Validate client credentials
-    if (!validateClientCredentials(authClientId, authClientSecret)) {
+    if (!(await validateClientCredentials(authClientId, authClientSecret))) {
       return res.status(401).json({
         error: 'invalid_client',
         error_description: 'Invalid client credentials',
@@ -686,7 +686,7 @@ app.post('/oauth/token', (req: Request, res: Response) => {
     }
 
     // Generate and return access token and refresh token
-    const { accessToken, refreshToken } = generateTokenPair(authClientId, undefined, resource);
+    const { accessToken, refreshToken } = await generateTokenPair(authClientId, undefined, resource);
     const tokenResponse = getTokenResponse(accessToken, refreshToken);
     
     console.log('OAuth token issued via client_credentials for client:', authClientId);
@@ -720,7 +720,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
   // Validate OAuth token
   const token = extractBearerToken(req.headers.authorization);
   
-  if (!token || !validateAccessToken(token)) {
+  if (!token || !(await validateAccessToken(token))) {
     // Return 401 with WWW-Authenticate header per RFC 9728
     // This tells the client where to get authorization
     const requestId = req.body.id !== undefined ? req.body.id : null;
