@@ -149,7 +149,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<OAuth2To
  * Automatically refreshes token if needed
  */
 export async function getAuthorizedClient(userId: string): Promise<OAuth2Client> {
-  const storedData = getTokens(userId);
+  const storedData = await getTokens(userId);
   
   if (!storedData || !storedData.tokens) {
     throw new Error(`No tokens found for user: ${userId}`);
@@ -173,7 +173,7 @@ export async function getAuthorizedClient(userId: string): Promise<OAuth2Client>
       tokens = await refreshAccessToken(tokens.refresh_token);
       
       // Update stored tokens
-      updateTokens(userId, tokens);
+      await updateTokens(userId, tokens);
     }
   }
   
@@ -190,7 +190,7 @@ export async function getAuthorizedClient(userId: string): Promise<OAuth2Client>
  * Revoke tokens for a user (logout)
  */
 export async function revokeTokens(userId: string): Promise<boolean> {
-  const storedData = getTokens(userId);
+  const storedData = await getTokens(userId);
   
   if (!storedData || !storedData.tokens) {
     return false;
@@ -218,7 +218,7 @@ export async function handleOAuthCallback(
   const { tokens, email } = await exchangeCodeForTokens(code);
   
   // Save tokens
-  saveTokens(userId, tokens, email);
+  await saveTokens(userId, tokens, email);
   
   return { email };
 }
@@ -226,16 +226,16 @@ export async function handleOAuthCallback(
 /**
  * Check if a user is authenticated
  */
-export function isAuthenticated(userId: string): boolean {
-  const storedData = getTokens(userId);
+export async function isAuthenticated(userId: string): Promise<boolean> {
+  const storedData = await getTokens(userId);
   return !!storedData && !!storedData.tokens && !!storedData.tokens.access_token;
 }
 
 /**
  * Get the email for an authenticated user
  */
-export function getUserEmail(userId: string): string | null {
-  const storedData = getTokens(userId);
+export async function getUserEmail(userId: string): Promise<string | null> {
+  const storedData = await getTokens(userId);
   return storedData?.email || null;
 }
 

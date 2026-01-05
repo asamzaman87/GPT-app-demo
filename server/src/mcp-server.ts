@@ -408,7 +408,7 @@ async function handleGetPendingReservations(
   userId: string
 ): Promise<AppsToolResponse> {
   // Check authentication
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     const authUrl = getAuthUrl(userId);
     return {
       content: [{ type: 'text', text: 'User needs to authenticate with Google Calendar.' }],
@@ -478,7 +478,7 @@ async function handleRespondToInvite(
     };
   }
 
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     const authUrl = getAuthUrl(userId);
     return {
       content: [{ type: 'text', text: 'User needs to authenticate first.' }],
@@ -692,7 +692,7 @@ async function handleAddCommentToInvite(
     };
   }
 
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     const authUrl = getAuthUrl(userId);
     return {
       content: [{ type: 'text', text: 'User needs to authenticate first.' }],
@@ -749,7 +749,7 @@ async function handleRescheduleEvent(
     };
   }
 
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     const authUrl = getAuthUrl(userId);
     return {
       content: [{ type: 'text', text: 'User needs to authenticate first.' }],
@@ -792,15 +792,15 @@ async function handleRescheduleEvent(
 /**
  * Handle check_auth_status tool
  */
-function handleCheckAuthStatus(userId: string): AppsToolResponse {
-  const authenticated = isAuthenticated(userId);
+async function handleCheckAuthStatus(userId: string): Promise<AppsToolResponse> {
+  const authenticated = await isAuthenticated(userId);
   
   if (authenticated) {
     return {
       content: [{ type: 'text', text: 'User is connected to Google Calendar.' }],
       structuredContent: {
         authenticated: true,
-        email: getUserEmail(userId),
+        email: await getUserEmail(userId),
       },
       _meta: {
         'openai/outputTemplate': 'ui://widget/calendar-widget.html',
@@ -914,7 +914,7 @@ export function createMCPServer(): Server {
         ) as unknown as CallToolResult;
 
       case 'check_auth_status':
-        return handleCheckAuthStatus(userId) as unknown as CallToolResult;
+        return await handleCheckAuthStatus(userId) as unknown as CallToolResult;
 
       default:
         return {
@@ -1099,7 +1099,7 @@ export async function handleMCPRequest(
           );
 
         case 'check_auth_status':
-          return handleCheckAuthStatus(toolUserId);
+          return await handleCheckAuthStatus(toolUserId);
 
         default:
           return {

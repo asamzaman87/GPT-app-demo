@@ -127,14 +127,14 @@ app.get('/widgets/:name.html', (req: Request, res: Response) => {
 // ============================================
 
 // Get auth status
-app.get('/auth/status', (_req: Request, res: Response) => {
+app.get('/auth/status', async (_req: Request, res: Response) => {
   const userId = DEFAULT_USER_ID;
-  const authenticated = isAuthenticated(userId);
+  const authenticated = await isAuthenticated(userId);
   
   if (authenticated) {
     res.json({
       authenticated: true,
-      email: getUserEmail(userId),
+      email: await getUserEmail(userId),
     });
   } else {
     res.json({
@@ -255,9 +255,9 @@ app.get('/oauth/callback', async (req: Request, res: Response) => {
 });
 
 // Logout
-app.post('/auth/logout', (_req: Request, res: Response) => {
+app.post('/auth/logout', async (_req: Request, res: Response) => {
   const userId = DEFAULT_USER_ID;
-  deleteTokens(userId);
+  await deleteTokens(userId);
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -270,7 +270,7 @@ app.get('/api/pending-invites', async (req: Request, res: Response) => {
   const userId = DEFAULT_USER_ID;
   const { start_date, end_date } = req.query;
 
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     return res.status(401).json({
       success: false,
       error: 'Not authenticated',
@@ -296,7 +296,7 @@ app.get('/api/conflicting-events', async (req: Request, res: Response) => {
   const userId = DEFAULT_USER_ID;
   const { start_date, end_date } = req.query;
 
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     return res.status(401).json({
       success: false,
       error: 'Not authenticated',
@@ -322,7 +322,7 @@ app.post('/api/respond', async (req: Request, res: Response) => {
   const userId = DEFAULT_USER_ID;
   const { eventId, response } = req.body;
 
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     return res.status(401).json({
       success: false,
       error: 'Not authenticated',
@@ -358,7 +358,7 @@ app.post('/api/add-comment', async (req: Request, res: Response) => {
   const userId = DEFAULT_USER_ID;
   const { eventId, comment } = req.body;
 
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     return res.status(401).json({
       success: false,
       error: 'Not authenticated',
@@ -394,7 +394,7 @@ app.post('/api/reschedule-event', async (req: Request, res: Response) => {
   const userId = DEFAULT_USER_ID;
   const { eventId, newStartTime, newEndTime } = req.body;
 
-  if (!isAuthenticated(userId)) {
+  if (!(await isAuthenticated(userId))) {
     return res.status(401).json({
       success: false,
       error: 'Not authenticated',

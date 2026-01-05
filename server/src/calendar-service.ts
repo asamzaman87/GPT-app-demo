@@ -146,7 +146,7 @@ export async function getPendingInvites(
   endDate?: string
 ): Promise<PendingInvitesResponse> {
   const calendar = await getCalendarClient(userId);
-  const userEmail = getUserEmail(userId);
+  const userEmail = await getUserEmail(userId);
   
   if (!userEmail) {
     throw new Error('User email not found');
@@ -213,7 +213,7 @@ export async function respondToInvite(
   response: 'accepted' | 'declined' | 'tentative'
 ): Promise<RespondToInviteResponse> {
   const calendar = await getCalendarClient(userId);
-  const userEmail = getUserEmail(userId);
+  const userEmail = await getUserEmail(userId);
   
   if (!userEmail) {
     throw new Error('User email not found');
@@ -295,7 +295,7 @@ export async function addCommentToInvite(
   comment: string
 ): Promise<RespondToInviteResponse> {
   const calendar = await getCalendarClient(userId);
-  const userEmail = getUserEmail(userId);
+  const userEmail = await getUserEmail(userId);
   
   if (!userEmail) {
     throw new Error('User email not found');
@@ -376,7 +376,7 @@ export async function rescheduleEvent(
   calendarId?: string
 ): Promise<RespondToInviteResponse> {
   const calendar = await getCalendarClient(userId);
-  const userEmail = getUserEmail(userId);
+  const userEmail = await getUserEmail(userId);
   
   if (!userEmail) {
     throw new Error('User email not found');
@@ -518,7 +518,7 @@ export async function getConflictingEvents(
   endDate?: string
 ): Promise<PendingInvitesResponse> {
   const calendar = await getCalendarClient(userId);
-  const userEmail = getUserEmail(userId);
+  const userEmail = await getUserEmail(userId);
   
   if (!userEmail) {
     throw new Error('User email not found');
